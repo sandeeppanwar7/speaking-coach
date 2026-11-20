@@ -158,6 +158,29 @@ td.num { font-family: var(--mono); font-variant-numeric: tabular-nums }
   .hist-table td.when::before, .hist-table td.type::before { content: none }
   .hist-table td.score { grid-column: 1 / -1; font-size: 26px; font-weight: 700; padding-bottom: 10px; border-bottom: 1px solid var(--line) }
 }
+/* Conversation mode */
+.conv-lang { display: grid; gap: 8px; justify-items: start }
+.conv-tips { font-size: 15px }
+.who-pill { font: 700 14px var(--body); padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); min-width: 110px; text-align: center }
+.who-pill.me { background: var(--accent); border-color: var(--accent); color: var(--accent-ink) }
+.who-pill.other { color: var(--ink); border-color: var(--ink) }
+.conv-check { display: grid; gap: 8px; padding: 14px 16px; background: var(--band); border-radius: 10px }
+.conv-say { font: 600 20px/1.4 var(--display) }
+.meter { height: 8px; background: var(--surface); border-radius: 999px; overflow: hidden }
+.meter-fill { height: 100%; width: 0; background: var(--accent); transition: width .05s linear }
+.cl { margin: 0 0 6px }
+.cl .who { font: 700 12px var(--body); text-transform: uppercase; letter-spacing: .06em; margin-right: 6px }
+.cl.me .who { color: var(--accent) }
+.cl.other { color: var(--muted) }
+.conv-tl-wrap { display: grid; gap: 8px }
+.conv-tl { position: relative; height: 22px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; overflow: hidden }
+.conv-tl span { position: absolute; top: 0; bottom: 0 }
+.conv-tl .me, .legend .lg-me { background: var(--accent) }
+.conv-tl .other, .legend .lg-other { background: var(--muted); opacity: .45 }
+.conv-lines { display: grid; gap: 6px }
+.conv-lines summary { cursor: pointer; font-weight: 700; color: var(--accent) }
+.conv-coach { display: grid; gap: 10px; border-top: 1px solid var(--line); padding-top: 16px }
+.conv-coach .btn { justify-self: start }
 /* Daily drills */
 .streak { display: grid; justify-items: center; padding: 8px 16px; border: 1px solid var(--line); border-radius: 12px; font-size: 13px; color: var(--muted) }
 .streak .mono { font-size: 28px; font-weight: 700; color: var(--accent); line-height: 1.1 }
@@ -246,6 +269,7 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
 
   <nav class="tabs" role="tablist">
     <button class="tab" role="tab" id="tab-live" aria-selected="true" aria-controls="panel-live">Speak live</button>
+    <button class="tab" role="tab" id="tab-conv" aria-selected="false" aria-controls="panel-conv">Conversation</button>
     <button class="tab" role="tab" id="tab-file" aria-selected="false" aria-controls="panel-file">Analyze a recording</button>
     <button class="tab" role="tab" id="tab-drills" aria-selected="false" aria-controls="panel-drills">Daily drills</button>
     <button class="tab" role="tab" id="tab-tips" aria-selected="false" aria-controls="panel-tips">Best practices</button>
@@ -301,6 +325,41 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
       <p class="note" id="coachNote">Copies your transcript and scores as a ready-made prompt. Paste it into Claude or any AI chat to get specific fixes and a drill for tomorrow.</p>
       <div class="coach-out" id="coachOut"></div>
     </div>
+  </section>
+
+  <!-- CONVERSATION -->
+  <section class="panel" id="panel-conv" role="tabpanel" aria-labelledby="tab-conv" hidden>
+    <div class="card">
+      <span class="label">Conversation mode</span>
+      <h2>Rate yourself in a real conversation</h2>
+      <p class="note">Press Start before you talk to someone and stop when you're done. A quick voice check teaches the app how you sound, then it rates only your part: how much you talked, your pace, filler words, how long you held the floor and how many questions you asked.</p>
+      <div class="conv-lang">
+        <span class="label">Conversation language</span>
+        <div class="seg" role="group" aria-label="Conversation language" id="convLangSeg">
+          <button class="seg-btn" data-clang="en">English</button>
+          <button class="seg-btn" data-clang="hi" lang="hi">हिन्दी</button>
+          <button class="seg-btn" data-clang="mix">Mixed / Hinglish</button>
+        </div>
+      </div>
+      <ul class="steps conv-tips">
+        <li>Keep your phone or laptop <b>closer to you</b> than to the other person. Louder speech counts as you.</li>
+        <li>With headphones the mic hears only you, so everything counts as you.</li>
+        <li><b>Tell the other person you're recording.</b> The audio stays on your device and is never uploaded.</li>
+      </ul>
+      <div class="controls">
+        <button class="btn primary rec" id="convBtn"><span class="dot"></span><span id="convLabel">Start</span></button>
+        <span class="timer mono" id="convTimer">0:00</span>
+        <span class="who-pill" id="convWho" hidden></span>
+      </div>
+      <p class="status" id="convStatus"></p>
+      <div class="conv-check" id="convCheck" hidden>
+        <span class="label">Voice check · read this out loud</span>
+        <p class="conv-say" id="convSay"></p>
+        <div class="meter"><div class="meter-fill" id="convMeter"></div></div>
+      </div>
+      <div class="transcript conv-transcript" id="convTranscript" aria-live="polite"></div>
+    </div>
+    <div class="card" id="convResults"></div>
   </section>
 
   <!-- FILE -->
@@ -726,7 +785,7 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
 
   // Static page text: every element whose content is plain text plus inline tags gets swapped as a whole.
   const INLINE = new Set(["B", "STRONG", "EM", "I", "SPAN", "SMALL", "A", "BR", "Q", "CODE", "MARK"]);
-  const SKIP_IDS = new Set(["liveResults", "fileResults", "history", "routine", "transcript", "coachOut", "passage", "paceText", "twister", "passageCat", "promptText", "passageTitle", "drillSummary", "streakNum", "recStatus", "recLabel", "timer", "breathBtn", "breathPhase", "breathCount", "breathLeft", "twisterPos", "paceBtn", "minuteTopic", "minuteClock", "minuteBtn", "tallyNum", "minuteResult", "coachBtn", "coachNote", "clearHist", "langSwitch"]);
+  const SKIP_IDS = new Set(["liveResults", "fileResults", "history", "routine", "transcript", "coachOut", "passage", "paceText", "twister", "passageCat", "promptText", "passageTitle", "drillSummary", "streakNum", "recStatus", "recLabel", "timer", "breathBtn", "breathPhase", "breathCount", "breathLeft", "twisterPos", "paceBtn", "minuteTopic", "minuteClock", "minuteBtn", "tallyNum", "minuteResult", "coachBtn", "coachNote", "clearHist", "langSwitch", "convLabel", "convTimer", "convWho", "convStatus", "convSay", "convMeter", "convTranscript", "convResults"]);
   const SKIP_CLASSES = ["done-btn", "timer-btn", "sw-btn", "sw-best", "sw-time"];
   const staticEls = [];
   const skipped = (el) => (el.id && SKIP_IDS.has(el.id)) || SKIP_CLASSES.some((c) => el.classList.contains(c));
@@ -754,7 +813,7 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
   document.querySelectorAll("#langSwitch [data-lang]").forEach((b) => b.addEventListener("click", () => setLang(b.dataset.lang)));
 
   // ---------- tabs ----------
-  const tabs = [["tab-live", "panel-live"], ["tab-file", "panel-file"], ["tab-drills", "panel-drills"], ["tab-tips", "panel-tips"], ["tab-voice", "panel-voice"]];
+  const tabs = [["tab-live", "panel-live"], ["tab-conv", "panel-conv"], ["tab-file", "panel-file"], ["tab-drills", "panel-drills"], ["tab-tips", "panel-tips"], ["tab-voice", "panel-voice"]];
   function showTab(id) {
     tabs.forEach(([tb, p]) => { const on = tb === id; $(tb).setAttribute("aria-selected", on); $(p).hidden = !on; });
     charts.forEach(([r, cv]) => drawChart(r, cv));
@@ -1042,7 +1101,7 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
   const modeLabel = (r) => (r.align ? "Reading" : null);
 
   // ---------- live speech ----------
-  let dict = null, listening = false, liveText = "", partial = "", listenStart = 0, listenedMs = 0, tick = null, lastLive = null;
+  let rawDict = null, dict = null, listening = false, liveText = "", partial = "", listenStart = 0, listenedMs = 0, tick = null, lastLive = null;
   const renderTranscript = () => { $("transcript").innerHTML = highlight(liveText) + (partial ? `<span class="partial"> ${esc(partial)}</span>` : ""); $("transcript").scrollTop = 1e6; };
   const elapsed = () => (listenedMs + (listenStart ? performance.now() - listenStart : 0)) / 1000;
   function setRecUI(state) {
@@ -1087,7 +1146,7 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
   }
 
   $("recBtn").addEventListener("click", () => {
-    if (!dict) return;
+    if (!dict || conv) return;
     if (listening) { dict.stop().catch(() => {}); return; }
     liveText = ""; partial = ""; listenedMs = 0; listenStart = 0;
     $("transcript").innerHTML = ""; $("timer").textContent = "0:00"; $("recStatus").textContent = t("Listening...");
@@ -1096,7 +1155,7 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
   });
 
   // Wraps the browser's Web Speech API in a small start/stop/onPartial/onFinal/onState interface.
-  function makeWebSpeech() {
+  function makeWebSpeech(langFn) {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) return null;
     let rec = null, want = false, state = "idle", lastErr = null, stopResolve = null;
@@ -1106,7 +1165,7 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
     const ERR = { "not-allowed": "not_granted", "service-not-allowed": "not_granted", "audio-capture": "not_granted", network: "upstream_error", "language-not-supported": "unavailable" };
     function make() {
       rec = new SR(); rec.continuous = true; rec.interimResults = true;
-      rec.lang = lang === "hi" ? "hi-IN" : /^en/i.test(navigator.language || "") ? navigator.language : "en-US";
+      rec.lang = langFn ? langFn() : lang === "hi" ? "hi-IN" : /^en/i.test(navigator.language || "") ? navigator.language : "en-US";
       rec.onstart = () => { if (state === "starting") setState("listening"); };
       rec.onresult = (e) => {
         let interim = "";
@@ -1161,9 +1220,10 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
   function wireDictation(d) {
     dict = d;
     if (!d) return noDictation();
-    d.onPartial(({ text }) => { partial = text; renderTranscript(); });
-    d.onFinal(({ text }) => { liveText += liveText ? text : text.replace(/^\s+/, ""); partial = ""; renderTranscript(); });
+    d.onPartial(({ text }) => { if (conv) return; partial = text; renderTranscript(); });
+    d.onFinal(({ text }) => { if (conv) return; liveText += liveText ? text : text.replace(/^\s+/, ""); partial = ""; renderTranscript(); });
     d.onState(({ state, reason }) => {
+      if (conv) return;
       setRecUI(state);
       if (state === "listening") {
         listenStart = performance.now();
@@ -1180,11 +1240,11 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
   // Inside claude.ai the platform's dictation is used; anywhere else, the browser's own speech recognition.
   const cl = window.claude;
   if (cl && cl.use) {
-    cl.use("dictation").then((raw) => wireDictation(raw ? {
+    cl.use("dictation").then((raw) => { rawDict = raw; wireDictation(raw ? {
       start: () => raw.start(lang === "hi" ? { language: "hi" } : undefined),
       stop: () => raw.stop(),
       onPartial: (f) => raw.onPartial(f), onFinal: (f) => raw.onFinal(f), onState: (f) => raw.onState(f),
-    } : makeWebSpeech())).catch(() => wireDictation(makeWebSpeech()));
+    } : makeWebSpeech()); }).catch(() => wireDictation(makeWebSpeech()));
   } else wireDictation(makeWebSpeech());
   onLang(() => { setRecUI(listening ? "listening" : "idle"); if (dict == null || $("recBtn").disabled) { if ($("recBtn").disabled) noDictation(); } });
 
@@ -1236,26 +1296,28 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
   $("coachBtn").onclick = async () => {
     const r = lastLive;
     if (!r) { $("coachOut").innerHTML = `<p>${t("Record or paste your own session first, then ask for coaching.")}</p>`; return; }
-    const input = coachPrompt(r);
+    runCoach(coachPrompt(r), $("coachOut"), $("coachBtn"));
+  };
+  async function runCoach(input, out, btn) {
     if (sample) {
-      $("coachBtn").disabled = true;
-      $("coachOut").innerHTML = `<p class="note">${t("Thinking...")}</p>`;
+      btn.disabled = true;
+      out.innerHTML = `<p class="note">${t("Thinking...")}</p>`;
       try {
-        const { text } = await sample(input, { onText: ({ text }) => { $("coachOut").innerHTML = mdLite(text); } });
-        $("coachOut").innerHTML = mdLite(text);
+        const { text } = await sample(input, { onText: ({ text }) => { out.innerHTML = mdLite(text); } });
+        out.innerHTML = mdLite(text);
       } catch (e) {
-        $("coachOut").innerHTML = "<p>" + (e.code === "not_granted" ? t("Coaching needs permission to ask Claude. You can allow it from this page's Permissions menu.") : e.code === "rate_limited" ? t("Too many requests right now. Try again in a minute.") : t("Couldn't get coaching this time. Try again.")) + "</p>";
-      } finally { $("coachBtn").disabled = false; }
+        out.innerHTML = "<p>" + (e.code === "not_granted" ? t("Coaching needs permission to ask Claude. You can allow it from this page's Permissions menu.") : e.code === "rate_limited" ? t("Too many requests right now. Try again in a minute.") : t("Couldn't get coaching this time. Try again.")) + "</p>";
+      } finally { btn.disabled = false; }
       return;
     }
     try {
       await navigator.clipboard.writeText(input);
-      $("coachOut").innerHTML = `<p>${t("<b>Copied.</b> Paste it into <a href=\"https://claude.ai/new\" target=\"_blank\" rel=\"noopener\">Claude</a> or any AI chat.")}</p>`;
+      out.innerHTML = `<p>${t("<b>Copied.</b> Paste it into <a href=\"https://claude.ai/new\" target=\"_blank\" rel=\"noopener\">Claude</a> or any AI chat.")}</p>`;
     } catch (e) {
-      $("coachOut").innerHTML = `<p class="note">${t("Your browser blocked copying. Select the text below and copy it yourself.")}</p><textarea readonly id="coachText"></textarea>`;
-      $("coachText").value = input; $("coachText").select();
+      out.innerHTML = `<p class="note">${t("Your browser blocked copying. Select the text below and copy it yourself.")}</p><textarea readonly></textarea>`;
+      const ta = out.querySelector("textarea"); ta.value = input; ta.select();
     }
-  };
+  }
 
   // ---------- recording analysis ----------
   const charts = [], audioViews = [];
@@ -1288,7 +1350,7 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
   const mean = (a) => a.reduce((s, v) => s + v, 0) / (a.length || 1);
   const std = (a) => { const m = mean(a); return Math.sqrt(mean(a.map((v) => (v - m) ** 2))); };
 
-  function analyzeAudio({ x, sr }) {
+  function analyzeAudio({ x, sr }, opts = {}) {
     const hop = Math.round(sr * 0.01), win = Math.round(sr * 0.04);
     const nF = Math.max(0, Math.floor((x.length - win) / hop));
     const db = new Float32Array(nF);
@@ -1299,6 +1361,7 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
     const mask = new Uint8Array(nF); for (let i = 0; i < nF; i++) mask[i] = db[i] > thr ? 1 : 0;
     const runs = (val, maxLen, set) => { let i = 0; while (i < nF) { if (mask[i] === val) { let j = i; while (j < nF && mask[j] === val) j++; if (j - i < maxLen && i > 0 && j < nF) for (let k = i; k < j; k++) mask[k] = set; i = j; } else i++; } };
     runs(0, 15, 1); runs(1, 8, 0);
+    if (opts.keep) for (let i = 0; i < nF; i++) if (mask[i] && !opts.keep(i)) mask[i] = 0;
     const first = mask.indexOf(1), last = mask.lastIndexOf(1);
     if (first < 0 || last - first < 300) throw new Error("short");
 
@@ -1306,7 +1369,7 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
     const minL = Math.floor(sr / 400), maxL = Math.ceil(sr / 75);
     const f0 = new Float32Array(nF);
     for (let i = first; i <= last; i++) {
-      if (!mask[i]) continue;
+      if (!mask[i] || (opts.stride > 1 && i % opts.stride)) continue;
       const o = i * hop; if (o + win + maxL >= x.length) break;
       let m = 0; for (let j = 0; j < win; j++) m += x[o + j]; m /= win;
       let e0 = 0; for (let j = 0; j < win; j++) { const v = x[o + j] - m; e0 += v * v; }
@@ -1485,8 +1548,8 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
     const cols = [t("When"), t("Type"), t("Score"), t("Pace"), t("Fillers / min"), t("Pitch range"), t("Length")];
     const length = (e) => (e.words != null ? t("{n} words", { n: e.words }) : (e.extra || "").replace(/^(\d+) words$/, (m, n) => t("{n} words", { n })));
     $("history").innerHTML = `<div class="table-wrap"><table class="hist-table"><thead><tr>${cols.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>` +
-      h.slice(0, 15).map((e) => `<tr><td class="when" data-label="${esc(cols[0])}">${new Date(e.t).toLocaleString(lang === "hi" ? "hi-IN" : [], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</td><td class="type" data-label="${esc(cols[1])}">${esc(t(e.mode))}${e.lang === "hi" ? " · हिन्दी" : ""}</td>
-        <td class="num score" data-label="${esc(cols[2])}">${e.score}${e.score === best ? " ★" : ""}</td><td class="num" data-label="${esc(cols[3])}">${e.wpm} ${esc(t("wpm"))}</td>
+      h.slice(0, 15).map((e) => `<tr><td class="when" data-label="${esc(cols[0])}">${new Date(e.t).toLocaleString(lang === "hi" ? "hi-IN" : [], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</td><td class="type" data-label="${esc(cols[1])}">${esc(t(e.mode))}${e.lang === "hi" ? " · हिन्दी" : e.lang === "mix" ? " · Hinglish" : ""}</td>
+        <td class="num score" data-label="${esc(cols[2])}">${e.score}${e.score === best ? " ★" : ""}</td><td class="num" data-label="${esc(cols[3])}">${e.wpm != null ? e.wpm + " " + esc(t("wpm")) : "–"}</td>
         <td class="num" data-label="${esc(cols[4])}">${e.fpm != null ? e.fpm.toFixed(1) : "–"}</td><td class="num" data-label="${esc(cols[5])}">${e.pitch != null ? e.pitch.toFixed(1) + " st" : "–"}</td><td class="num" data-label="${esc(cols[6])}">${esc(length(e))}</td></tr>`).join("") +
       `</tbody></table></div>`;
   }
@@ -1682,12 +1745,316 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
   });
   onLang(() => timerStops.forEach((f) => f()));
 
+  // ---------- conversation mode: rate your side of a real conversation ----------
+  // Loudness is sampled every 50 ms. After a short voice check, speech within 6 dB of your
+  // voice-check level counts as you; quieter speech counts as the other person.
+  const CONV_TICK = 50;
+  const CLANG_KEY = "speaking-coach.convLang";
+  const storedConvLang = () => { try { const v = localStorage.getItem(CLANG_KEY); return v === "en" || v === "hi" || v === "mix" ? v : null; } catch (e) { return null; } };
+  let convLang = storedConvLang() || lang;
+  const convLists = (table) => (convLang === "en" ? table.en : convLang === "hi" ? table.hi : table.en.concat(table.hi));
+  const convRecLang = () => (convLang === "en" ? (/^en/i.test(navigator.language || "") ? navigator.language : "en-US") : "hi-IN");
+  const CONV_SAY = { en: "Hi, this is a quick test of my voice.", hi: "नमस्ते, यह मेरी आवाज़ की एक छोटी सी जाँच है।", mix: "Hi, यह मेरी आवाज़ का एक quick test है।" };
+  const HIGHLIGHT_MIX = hw("अं+|उं+|उम्+|हम्म+|मतलब|यानी|यानि|वो क्या है|क्या कहते हैं|है ना|एक्चुअली|बेसिकली|लाइक|um+|uh+|erm+|hmm+|basically|actually|literally|like|you know|i mean|kind of|sort of");
+  const convHighlight = (text) => esc(text).replace(convLang === "en" ? HIGHLIGHT.en : convLang === "hi" ? HIGHLIGHT.hi : HIGHLIGHT_MIX, "<mark>$&</mark>");
+  function renderConvLang() { document.querySelectorAll("#convLangSeg [data-clang]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.clang === convLang)); }
+  document.querySelectorAll("#convLangSeg [data-clang]").forEach((b) => b.addEventListener("click", () => {
+    if (conv) return;
+    convLang = b.dataset.clang;
+    try { localStorage.setItem(CLANG_KEY, convLang); } catch (e) {}
+    renderConvLang();
+    if (convIsExample) renderConv(exampleConv(), true);
+  }));
+
+  // Counts filler matches from several pattern lists; a word matched by two lists (e.g. "basically") counts once.
+  function countFillers(text, lists) {
+    const hits = [];
+    lists.forEach(([name, re]) => { for (const m of text.matchAll(re)) hits.push([m.index, m.index + m[0].length, name]); });
+    hits.sort((a, b) => a[0] - b[0] || b[1] - a[1]);
+    const tally = {}; let end = -1, total = 0;
+    hits.forEach(([st, en, name]) => { if (st < end) return; end = en; total++; tally[name] = (tally[name] || 0) + 1; });
+    return { total, list: Object.entries(tally).map(([k, c]) => `${k} ×${c}`).join(", ") };
+  }
+  const QWORDS = {
+    en: [/^(what|how|why|when|where|who|whom|which|whose|do|does|did|can|could|would|will|is|are|was|were|have|has|should|shall|may|might)\b/i],
+    hi: [/^(क्या|कैसे|क्यों|कब|कहाँ|कहां|कौन|कितना|कितने|कितनी|किसने|किसको|किसका|किसकी|किसके)(?![\p{L}\p{M}])/u, /(?<![\p{L}\p{M}])क्या\s*[।.]?$/u],
+  };
+  function countQuestions(lines) {
+    const res = convLists(QWORDS);
+    let n = 0;
+    lines.forEach((line) => line.split(/(?<=[.!?।])\s+/).forEach((sen) => { sen = sen.trim(); if (sen && (/\?\s*$/.test(sen) || res.some((re) => re.test(sen)))) n++; }));
+    return n;
+  }
+  // "m" = you, "o" = other person, "" = silence. A 350 ms majority vote stops one loud syllable flipping the speaker.
+  function labelLevels(levels, floors, myLevel) {
+    const raw = levels.map((db, i) => (db > floors[i] + 9 ? (db >= myLevel - 6 ? "m" : "o") : ""));
+    return raw.map((_, i) => {
+      const c = { m: 0, o: 0, "": 0 };
+      for (let k = Math.max(0, i - 3); k <= Math.min(raw.length - 1, i + 3); k++) c[raw[k]]++;
+      return c.m >= c.o && c.m >= c[""] ? "m" : c.o >= c[""] ? "o" : "";
+    });
+  }
+  function convTimeline(labels) {
+    const segs = [];
+    labels.forEach((l, i) => { const last = segs[segs.length - 1]; if (last && last.who === l) last.end = i + 1; else segs.push({ who: l, start: i, end: i + 1 }); });
+    let myTicks = 0, otherTicks = 0, longest = 0, turnStart = -1, lastMe = -1;
+    const gap = 1500 / CONV_TICK; // a turn continues through breaks shorter than 1.5 s
+    labels.forEach((l, i) => {
+      if (l === "o") otherTicks++;
+      if (l !== "m") return;
+      myTicks++;
+      if (turnStart < 0 || i - lastMe > gap) turnStart = i;
+      lastMe = i; longest = Math.max(longest, i - turnStart + 1);
+    });
+    return { segs, myTicks, otherTicks, longestTicks: longest };
+  }
+  function whoSaid(labels, from, to) {
+    let m = 0, o = 0;
+    for (let i = Math.max(0, from); i < Math.min(labels.length, to); i++) { if (labels[i] === "m") m++; else if (labels[i] === "o") o++; }
+    return o > m ? "o" : "m";
+  }
+
+  let conv = null, convSpeech = null, lastConv = null, convIsExample = true;
+  const convNowTick = () => Math.round((performance.now() - conv.recStart) / CONV_TICK);
+  function initConvSpeech() {
+    const src = rawDict
+      ? { start: () => rawDict.start(convLang === "en" ? undefined : { language: "hi" }), stop: () => rawDict.stop(), onPartial: (f) => rawDict.onPartial(f), onFinal: (f) => rawDict.onFinal(f), onState: (f) => rawDict.onState(f) }
+      : makeWebSpeech(convRecLang);
+    if (!src) return null;
+    src.onPartial(({ text }) => { if (conv && conv.phase === "rec") { conv.partial = text; renderConvTranscript(); } });
+    src.onFinal(({ text }) => {
+      if (!conv || conv.phase === "check" || !conv.recStart || !text.trim()) return;
+      const to = convNowTick();
+      conv.lines.push({ text: text.trim(), from: conv.lastFinal, to, who: conv.noLevels ? "m" : whoSaid(conv.raw, conv.lastFinal, to) });
+      conv.lastFinal = to; conv.partial = ""; renderConvTranscript();
+    });
+    src.onState(({ state, reason }) => {
+      if (!conv || state !== "idle") return;
+      conv.speechDone = true;
+      if (conv.phase === "finishing") convFinish();
+      else if (conv.phase === "rec" && reason !== "stopped") $("convStatus").textContent = t("Speech-to-text stopped, so the transcript may be incomplete. Your voice is still being measured.");
+    });
+    return src;
+  }
+  function renderConvTranscript() {
+    const c = conv; if (!c) return;
+    $("convTranscript").innerHTML = c.lines.map(convLineHtml).join("") + (c.partial ? `<p class="cl partial">${esc(c.partial)}</p>` : "");
+    $("convTranscript").scrollTop = 1e6;
+  }
+  const convLineHtml = (l) => `<p class="cl ${l.who === "m" ? "me" : "other"}"><span class="who">${l.who === "m" ? t("You") : t("Other")}</span>${convHighlight(l.text)}</p>`;
+  function setConvUI() {
+    const ph = conv ? conv.phase : "idle";
+    $("convBtn").classList.toggle("live", ph === "rec");
+    $("convLabel").textContent = ph === "idle" ? t("Start") : ph === "check" ? t("Cancel") : ph === "rec" ? t("Stop and rate me") : t("Finishing...");
+    $("convBtn").disabled = ph === "finishing" || ph === "done";
+    $("convCheck").hidden = ph !== "check";
+    $("convWho").hidden = ph !== "rec" || conv.noLevels;
+    $("convSay").textContent = CONV_SAY[convLang];
+    if (ph === "check") $("convStatus").textContent = t("Voice check: read the sentence below out loud, at your normal volume.");
+    if (ph === "rec") $("convStatus").textContent = conv.noLevels ? t("Recording. Microphone levels aren't available here, so everything heard counts as you.") : t("Recording. Talk normally; tap Stop when the conversation ends.");
+    if (ph === "finishing") $("convStatus").textContent = t("Rating your conversation...");
+  }
+  function convCleanup(c) {
+    clearInterval(c.sampler); clearInterval(c.clock);
+    if (c.stream) c.stream.getTracks().forEach((tr) => tr.stop());
+    if (c.ctx) c.ctx.close().catch(() => {});
+  }
+  function convAbort(msg) {
+    const c = conv; if (!c) return;
+    conv = null; convCleanup(c);
+    if (convSpeech && !c.speechDone) convSpeech.stop().catch(() => {});
+    setConvUI(); $("convStatus").textContent = msg || "";
+  }
+  $("convBtn").addEventListener("click", () => {
+    if (conv) { if (conv.phase === "check") convAbort(t("Voice check cancelled.")); else if (conv.phase === "rec") convStop(); return; }
+    if (listening) { $("convStatus").textContent = t("Stop the Speak live recording first."); return; }
+    if (!convSpeech) convSpeech = initConvSpeech();
+    conv = { phase: "check", lines: [], partial: "", levels: [], floors: [], raw: [], cal: [], chunks: [], lastFinal: 0, speechDone: !convSpeech };
+    // speech recognition has to start inside the click; the voice check runs while it warms up
+    if (convSpeech) { const c = conv; convSpeech.start().catch(() => { c.speechDone = true; }); }
+    $("convTranscript").innerHTML = ""; $("convTimer").textContent = "0:00"; $("convMeter").style.width = "0";
+    setConvUI();
+    convOpenMic(conv);
+  });
+  async function convOpenMic(c) {
+    try { c.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } }); }
+    catch (e) { c.stream = null; }
+    if (conv !== c) { if (c.stream) c.stream.getTracks().forEach((tr) => tr.stop()); return; }
+    if (!c.stream) {
+      if (c.speechDone) return convAbort(t("Couldn't use the microphone. Allow microphone access and try again."));
+      c.noLevels = true;
+      return convBeginRecording(c);
+    }
+    c.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const an = c.ctx.createAnalyser(); an.fftSize = 2048;
+    c.ctx.createMediaStreamSource(c.stream).connect(an);
+    if (window.MediaRecorder) { try { c.mr = new MediaRecorder(c.stream); c.mr.ondataavailable = (e) => { if (e.data.size) c.chunks.push(e.data); }; } catch (e) { c.mr = null; } }
+    const buf = new Float32Array(an.fftSize);
+    let sm = null;
+    const checkStart = performance.now();
+    c.sampler = setInterval(() => {
+      an.getFloatTimeDomainData(buf);
+      let sq = 0; for (let i = 0; i < buf.length; i++) sq += buf[i] * buf[i];
+      const db = 10 * Math.log10(sq / buf.length + 1e-12);
+      sm = sm == null ? db : sm * 0.7 + db * 0.3;
+      if (c.phase === "check") {
+        c.cal.push(sm);
+        $("convMeter").style.width = clamp(((sm + 70) / 50) * 100, 0, 100) + "%";
+        if (performance.now() - checkStart >= 4000) convCalibrate(c);
+        return;
+      }
+      if (c.phase !== "rec") return;
+      // background noise level: follows drops quickly, creeps up slowly
+      c.floor = sm < c.floor ? c.floor * 0.7 + sm * 0.3 : c.floor + 0.02;
+      const who = sm > c.floor + 9 ? (sm >= c.myLevel - 6 ? "m" : "o") : "";
+      c.levels.push(sm); c.floors.push(c.floor); c.raw.push(who);
+      $("convWho").textContent = who === "m" ? t("You") : who === "o" ? t("Other person") : "…";
+      $("convWho").className = "who-pill" + (who === "m" ? " me" : who === "o" ? " other" : "");
+    }, CONV_TICK);
+  }
+  function convCalibrate(c) {
+    const sorted = [...c.cal].sort((a, b) => a - b), q = (p) => sorted[Math.floor(p * (sorted.length - 1))];
+    const voice = q(0.8), quiet = q(0.1);
+    if (voice - quiet < 10) return convAbort(t("Couldn't hear you clearly. Hold the phone closer, read the sentence out loud and try again."));
+    c.myLevel = voice; c.floor = Math.min(quiet, voice - 20);
+    convBeginRecording(c);
+  }
+  function convBeginRecording(c) {
+    c.phase = "rec"; c.recStart = performance.now(); c.lastFinal = 0;
+    if (c.mr) c.mr.start();
+    c.clock = setInterval(() => { $("convTimer").textContent = fmtTime((performance.now() - c.recStart) / 1000); }, 250);
+    setConvUI();
+  }
+  function convStop() {
+    const c = conv; if (!c || c.phase !== "rec") return;
+    c.phase = "finishing"; c.recMs = performance.now() - c.recStart;
+    clearInterval(c.sampler); clearInterval(c.clock);
+    setConvUI();
+    if (c.speechDone) return convFinish();
+    convSpeech.stop().catch(() => {});
+    setTimeout(() => { if (conv === c && c.phase === "finishing") convFinish(); }, 4000);
+  }
+  async function convFinish() {
+    const c = conv; if (!c || c.phase === "done") return;
+    c.phase = "done";
+    const blob = await new Promise((res) => { if (!c.mr || c.mr.state === "inactive") return res(null); c.mr.onstop = () => res(new Blob(c.chunks, { type: c.mr.mimeType })); c.mr.stop(); });
+    convCleanup(c);
+    conv = null; setConvUI();
+    if (c.recMs < 15000) { $("convStatus").textContent = t("Too short to rate. Record at least 30 seconds of conversation."); return; }
+    const labels = c.noLevels ? null : labelLevels(c.levels, c.floors, c.myLevel);
+    if (labels) c.lines.forEach((l) => { l.who = whoSaid(labels, l.from, l.to); });
+    const session = { lines: c.lines, labels, noLevels: !!c.noLevels, totalMs: c.recMs, lang: convLang, voice: null };
+    lastConv = session;
+    let scored = renderConv(session, false);
+    $("convStatus").textContent = t("Rated. Your results are below.");
+    if (blob && blob.size && labels) {
+      try {
+        const audio = await decodeMono(blob);
+        const stride = c.recMs > 300000 ? Math.ceil(c.recMs / 300000) : 1;
+        session.voice = analyzeAudio(audio, { keep: (f) => labels[Math.floor((f * 10) / CONV_TICK)] === "m", stride });
+        scored = renderConv(session, false);
+      } catch (e) { /* not enough of your speech in the audio for voice metrics */ }
+    }
+    saveHistory({ mode: "Conversation", lang: convLang, score: scored.overall, wpm: scored.wpm, fpm: scored.fpm, pitch: session.voice ? session.voice.pitchRange : null, extra: fmtTime(c.recMs / 1000) });
+  }
+
+  function convScore(s) {
+    const me = s.lines.filter((l) => l.who === "m"), myText = me.map((l) => l.text).join(" ");
+    const tl = s.labels ? convTimeline(s.labels) : null;
+    const myMs = tl ? tl.myTicks * CONV_TICK : s.totalMs, otherMs = tl ? tl.otherTicks * CONV_TICK : 0;
+    const share = tl && myMs + otherMs ? Math.round((100 * myMs) / (myMs + otherMs)) : null;
+    const myMin = myMs / 60000;
+    const words = wordsOf(myText).length;
+    const wpm = myMs >= 10000 && words ? Math.round(words / myMin) : null;
+    const fill = countFillers(myText, convLists(FILLERS));
+    const fpm = myMs >= 10000 ? fill.total / myMin : null;
+    const longest = tl ? Math.round((tl.longestTicks * CONV_TICK) / 1000) : null;
+    const qs = countQuestions(me.map((l) => l.text)), qTarget = Math.max(1, Math.round(s.totalMs / 120000));
+    const shareS = share == null ? null : bandScore(share, 40, 60, 3);
+    const paceS = wpm == null ? null : bandScore(wpm, 130, 160, 2);
+    const fillS = fpm == null ? null : clamp(Math.round(100 - Math.max(0, fpm - 2) * 15), 0, 100);
+    const turnS = longest == null ? null : bandScore(longest, 0, 60, 1.5);
+    const qS = bandScore(qs, qTarget, qTarget * 4, 35);
+    const metrics = [
+      { name: t("Talk share"), value: share, display: share == null ? "–" : share + "%", unit: "", min: 0, max: 100, lo: 40, hi: 60, score: shareS ?? 0,
+        chip: share == null ? ["warn", t("Not measured")] : share > 60 ? [shareS >= 50 ? "warn" : "bad", t("Talking a lot")] : share < 40 ? [shareS >= 50 ? "warn" : "bad", t("Mostly listening")] : null,
+        tip: share == null ? t("Needs microphone levels to tell the two voices apart.") : share > 60 ? t("You did most of the talking. Ask a question and let the other person finish before you reply.") : share < 40 ? t("You mostly listened. Share your own view or an example more often.") : t("A balanced conversation: you talked and listened about equally.") },
+      { name: t("Your pace"), value: wpm, display: wpm == null ? "–" : String(wpm), unit: wpm == null ? "" : t("wpm"), min: 60, max: 240, lo: 130, hi: 160, score: paceS ?? 0, chip: wpm == null ? ["warn", t("Not measured")] : paceChip(wpm, paceS),
+        tip: wpm == null ? t("Not enough of your words were transcribed to measure pace.") : wpm > 160 ? t("You spoke fast. Slow down on your main points and pause before answering.") : wpm < 130 ? t("You spoke slowly. Know your point before you start, then say it.") : t("A comfortable pace that's easy to follow.") },
+      { name: t("Filler words"), value: fpm == null ? null : Math.round(fpm * 10) / 10, display: fpm == null ? "–" : (Math.round(fpm * 10) / 10).toFixed(1), unit: t("per min"), min: 0, max: 12, lo: 0, hi: 2, score: fillS ?? 0,
+        tip: fill.total ? t("Found: {list}. Replace each one with a silent pause.", { list: fill.list }) : t("No filler words detected in your part.") },
+      { name: t("Longest turn"), value: longest, display: longest == null ? "–" : String(longest), unit: longest == null ? "" : t("seconds"), min: 0, max: 180, lo: 0, hi: 60, score: turnS ?? 0, chip: longest == null ? ["warn", t("Not measured")] : null,
+        tip: longest == null ? t("Needs microphone levels to tell the two voices apart.") : longest > 60 ? t("Your longest turn ran {n} seconds. After about a minute, pause and check in: \"Does that make sense?\"", { n: longest }) : t("You kept your turns short enough for a real back-and-forth.") },
+      { name: t("Questions you asked"), value: qs, display: String(qs), unit: "", min: 0, max: Math.max(10, qTarget * 5), lo: qTarget, hi: qTarget * 4, score: qS,
+        tip: qs < qTarget ? t("Aim for at least {n}. Questions show interest and keep the other person talking.", { n: qTarget }) : t("Good. Questions show interest and keep the other person involved.") },
+    ];
+    if (s.voice) { const vm = audioMetrics(s.voice).metrics; metrics.push(vm[1], vm[3], vm[4]); }
+    const weights = [20, 20, 20, 15, 10, 15, 0, 0];
+    const parts = metrics.map((m, i) => [m.value == null ? null : m.score, weights[i] ?? 0]).filter(([sc, w]) => sc != null && w);
+    const overall = parts.length ? Math.round(parts.reduce((a, [sc, w]) => a + sc * w, 0) / parts.reduce((a, [, w]) => a + w, 0)) : 0;
+    return { metrics, overall, tl, share, wpm, fpm, longest, qs, myMs, otherMs };
+  }
+
+  function renderConv(s, isExample) {
+    convIsExample = isExample;
+    const sc = convScore(s);
+    const weakest = sc.metrics.filter((m) => m.value != null).sort((a, b) => a.score - b.score)[0];
+    const head = isExample
+      ? `<span class="example-flag">${t("Example session")}</span><p class="note">${t("This is a sample conversation so you can see the scorecard. Press Start to rate your own.")}</p>`
+      : `<p class="note">${t("{time} conversation", { time: fmtTime(s.totalMs / 1000) })}${s.noLevels ? " · " + t("everything counted as you") : ""}</p>`;
+    const n = s.labels ? s.labels.length : 0;
+    const timeline = sc.tl ? `<div class="conv-tl-wrap"><span class="label">${t("Who spoke when")}</span>
+      <div class="conv-tl" role="img" aria-label="${esc(t("Who spoke when"))}">${sc.tl.segs.filter((sg) => sg.who).map((sg) => `<span class="${sg.who === "m" ? "me" : "other"}" style="left:${(100 * sg.start) / n}%;width:${(100 * (sg.end - sg.start)) / n}%"></span>`).join("")}</div>
+      <div class="legend"><span><i class="lg-me"></i>${t("You")} · ${fmtTime(sc.myMs / 1000)}</span><span><i class="lg-other"></i>${t("Other person")} · ${fmtTime(sc.otherMs / 1000)}</span></div></div>` : "";
+    $("convResults").innerHTML = `
+      <div class="score-head">${ring(sc.overall)}
+        <div class="sum"><span class="label">${t("Your part of the conversation")}</span><h2>${sc.overall >= 80 ? t("A strong conversationalist") : sc.overall >= 60 ? t("Good conversation, one thing to fix") : t("Room to grow")}</h2>
+        ${weakest ? `<p>${t("Biggest win next time:")} <b>${esc(weakest.name.toLowerCase())}</b></p>` : ""}${head}</div></div>
+      ${timeline}
+      <div class="metrics">${sc.metrics.map(metricRow).join("")}</div>
+      ${s.lines.length ? `<details class="conv-lines"><summary>${t("Transcript")} (${s.lines.length})</summary>${s.lines.map(convLineHtml).join("")}</details>` : ""}
+      <div class="conv-coach"><button class="btn primary" id="convCoachBtn">${sample ? t("Get coaching") : t("Copy coaching prompt")}</button><div class="coach-out" id="convCoachOut"></div></div>`;
+    $("convCoachBtn").onclick = () => {
+      if (isExample || !s.lines.length) { $("convCoachOut").innerHTML = `<p>${t("Record your own conversation first, then ask for coaching.")}</p>`; return; }
+      runCoach(convCoachPrompt(s, sc), $("convCoachOut"), $("convCoachBtn"));
+    };
+    return sc;
+  }
+  function convCoachPrompt(s, sc) {
+    const stats = `talk share ${sc.share == null ? "unknown" : sc.share + "%"} (target 40-60%), pace ${sc.wpm ?? "unknown"} words per minute (target 130-160), filler words ${sc.fpm == null ? "unknown" : sc.fpm.toFixed(1)} per minute, longest turn ${sc.longest ?? "unknown"} seconds (target under 60), questions asked ${sc.qs}.`;
+    const lines = s.lines.map((l) => (l.who === "m" ? "Me: " : "Other: ") + l.text).join("\n");
+    return `You are a warm but direct conversation coach. Below is a speech-to-text transcript of a real conversation. Lines marked "Me" are the person you are coaching; "Other" is the person they talked with. Speaker labels were guessed from loudness, so a few may be wrong.\n\nMeasured stats for Me: ${stats}\n\nTranscript:\n"""${lines}"""\n\nReply in plain markdown, under 250 words, with exactly these sections:\n## What worked\n- 2 short bullets\n## Fix next\n- 3 bullets; each quotes a short phrase Me actually said and shows a better way to say it\n## Listening and turn-taking\nOne or two sentences on how well Me listened, asked questions and shared the conversation.\n## Try this next time\nOne specific habit for the next conversation.` +
+      (s.lang !== "en" ? "\n\nThe conversation was in Hindi or a Hindi-English mix. Write your entire reply in simple, natural Hindi (Devanagari script), with the section headings in Hindi too. Quote their words exactly as given." : "");
+  }
+
+  const CONV_EXAMPLE = {
+    en: [["m", "So I wanted to catch up about the launch plan. Basically, I think we're in good shape, but, um, the design work is running a bit late and I'm worried it pushes everything back by a week, and that would also affect the emails we planned for the first of the month, so we need to decide what to do today."], ["o", "Okay. How late are we talking?"], ["m", "About four days. The team is waiting on final copy from legal."], ["o", "Can we launch without the new banner and add it later?"], ["m", "Yes, we could do that. What would you need from me to make that work?"], ["o", "Just a revised timeline by Friday, and a quick note to the sales team so nobody is surprised."], ["m", "Great, I'll send both tomorrow morning. Does that work for you?"]],
+    hi: [["m", "तो मैं लॉन्च की योजना के बारे में बात करना चाहता था। मतलब, मुझे लगता है हम ठीक चल रहे हैं, लेकिन डिज़ाइन का काम थोड़ा पीछे है और मुझे डर है कि इससे सब कुछ एक हफ़्ता आगे खिसक जाएगा, और फिर महीने की शुरुआत वाले ईमेल पर भी असर पड़ेगा, इसलिए आज ही फ़ैसला करना होगा।"], ["o", "अच्छा। कितना पीछे है?"], ["m", "करीब चार दिन। टीम को लीगल से फ़ाइनल कॉपी का इंतज़ार है।"], ["o", "क्या हम नए बैनर के बिना लॉन्च करके उसे बाद में जोड़ सकते हैं?"], ["m", "हाँ, ऐसा कर सकते हैं। इसके लिए आपको मुझसे क्या चाहिए?"], ["o", "बस शुक्रवार तक नई टाइमलाइन, और सेल्स टीम को एक छोटा सा नोट ताकि किसी को हैरानी न हो।"], ["m", "ठीक है, मैं कल सुबह दोनों भेज दूँगा। आपके लिए यह ठीक रहेगा?"]],
+  };
+  // Builds a sample session: each line gets speaking time from its word count, with short pauses between turns.
+  function exampleConv() {
+    const labels = [], lines = [];
+    CONV_EXAMPLE[convLang === "en" ? "en" : "hi"].forEach(([who, text]) => {
+      const from = labels.length, ticks = Math.round(((wordsOf(text).length / (who === "m" ? 2.4 : 2.6)) * 1000) / CONV_TICK);
+      for (let i = 0; i < ticks; i++) labels.push(i % 40 === 39 ? "" : who);
+      for (let i = 0; i < 14; i++) labels.push("");
+      lines.push({ who, text, from, to: labels.length });
+    });
+    return { lines, labels, noLevels: false, totalMs: labels.length * CONV_TICK, lang: convLang, voice: null };
+  }
+  onLang(() => {
+    if (!storedConvLang()) convLang = lang;
+    renderConvLang(); setConvUI();
+    if (lastConv && !convIsExample) renderConv(lastConv, false); else renderConv(exampleConv(), true);
+  });
+
   // Switching language stops anything running so no label is left half-translated.
   function stopEverything() {
     if (listening && dict) dict.stop().catch(() => {});
     if (breathTimer) stopBreath();
     if (paceTimer) paceStop();
     if (minuteTimer) endMinute(false);
+    if (conv) convAbort("");
   }
 
   // ---------- initial example state ----------

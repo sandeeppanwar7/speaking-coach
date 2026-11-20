@@ -10,6 +10,8 @@ A free, single-page web app for practicing speaking out loud, in **English or Hi
 - **Pauses**: how often and how long you pause
 - **Volume**: whether your energy stays even, and whether you trail off at the end of sentences
 
+**Conversation mode:** press Start before you talk to someone and Stop afterwards. A 4-second voice check learns how loud you are, then louder speech counts as you and quieter speech as the other person. You get your talk share, pace, filler words, longest turn, questions asked and voice metrics for your part only, in English, Hindi or mixed Hinglish.
+
 You can also drop in a recording (M4A, MP3 or WAV) from Voice Memos or any recorder. Your scores are saved in your browser so you can track progress over time.
 
 ## Languages
