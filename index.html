@@ -194,6 +194,23 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
 .frames { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px }
 .frames > div { display: grid; gap: 6px; align-content: start; padding: 14px 16px; background: var(--bg); border-radius: 10px; min-width: 0 }
 .frames ol { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 15px }
+/* Best practices */
+.jump { display: flex; flex-wrap: wrap; gap: 8px }
+.jump a { font: 700 14px var(--body); color: var(--ink); text-decoration: none; padding: 7px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--bg) }
+.jump a:hover { border-color: var(--accent) }
+.jump a:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px }
+#panel-tips .card { scroll-margin-top: 16px }
+.tips { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px 24px }
+.tips li { display: grid; gap: 4px; padding: 12px 0 12px 14px; border-left: 3px solid var(--band); min-width: 0 }
+.tips b { font-size: 16px }
+.tips span { color: var(--muted); font-size: 15px }
+.dodont { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px }
+.dodont .col { display: grid; gap: 8px; align-content: start; padding: 14px 16px; border-radius: 10px; background: var(--bg); border-top: 3px solid var(--good); min-width: 0 }
+.dodont .col.dont { border-top-color: var(--bad) }
+.dodont .col.dont p { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--bad) }
+.checklist { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px }
+.checklist > div { display: grid; gap: 8px; align-content: start; padding: 14px 16px; background: var(--bg); border-radius: 10px; min-width: 0 }
+.checklist ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 15px }
 </style>
 </head>
 <body>
@@ -208,6 +225,7 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
     <button class="tab" role="tab" id="tab-live" aria-selected="true" aria-controls="panel-live">Speak live</button>
     <button class="tab" role="tab" id="tab-file" aria-selected="false" aria-controls="panel-file">Analyze a recording</button>
     <button class="tab" role="tab" id="tab-drills" aria-selected="false" aria-controls="panel-drills">Daily drills</button>
+    <button class="tab" role="tab" id="tab-tips" aria-selected="false" aria-controls="panel-tips">Best practices</button>
   </nav>
 
   <!-- LIVE -->
@@ -386,6 +404,120 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
     </div>
   </section>
 
+  <!-- BEST PRACTICES -->
+  <section class="panel" id="panel-tips" role="tabpanel" aria-labelledby="tab-tips" hidden>
+    <div class="card">
+      <span class="label">Speaking best practices</span>
+      <h2>What good speakers do differently</h2>
+      <p class="lede" style="margin-top:0">Short, practical rules you can use in your next meeting. Pick one or two to focus on each week instead of trying everything at once.</p>
+      <nav class="jump" aria-label="Jump to a section">
+        <a href="#tp-voice">Voice</a><a href="#tp-structure">Structure</a><a href="#tp-words">Word choice</a><a href="#tp-body">Body language</a><a href="#tp-nerves">Nerves</a><a href="#tp-meetings">Meetings</a><a href="#tp-video">Video calls</a><a href="#tp-checklist">Before a big talk</a>
+      </nav>
+    </div>
+
+    <div class="card" id="tp-voice">
+      <h2>Voice</h2>
+      <ul class="tips">
+        <li><b>Speak at 130 to 160 words per minute.</b><span>Most nervous speakers go above 180. Slow down further for the points that matter most.</span></li>
+        <li><b>Pause after important points.</b><span>One or two seconds of silence lets an idea land. It sounds confident, not hesitant.</span></li>
+        <li><b>End statements on a falling tone.</b><span>If your voice rises at the end, a statement sounds like a question and you sound unsure.</span></li>
+        <li><b>Stress one key word per sentence.</b><span>Leaning on the word that carries the meaning keeps you from sounding flat.</span></li>
+        <li><b>Breathe from your belly.</b><span>A low breath gives your voice power and steadiness. Shallow chest breathing makes it thin and fast.</span></li>
+        <li><b>Finish every word.</b><span>Pronounce the final t, d and k sounds. Swallowed endings are the most common reason people say "sorry, what?"</span></li>
+      </ul>
+    </div>
+
+    <div class="card" id="tp-structure">
+      <h2>Structure</h2>
+      <ul class="tips">
+        <li><b>Lead with your point.</b><span>Say the conclusion first, then explain it. Listeners can't scroll back up like readers can.</span></li>
+        <li><b>One idea per sentence.</b><span>Long chains of "and then, and also" lose people. Finish the thought and stop.</span></li>
+        <li><b>Group things in threes.</b><span>Three reasons, three steps, three examples. It's easy to remember and sounds complete.</span></li>
+        <li><b>Signpost where you're going.</b><span>"There are two reasons. First..." helps people follow and makes you sound organized.</span></li>
+        <li><b>Use one concrete example.</b><span>A specific story or number is remembered long after general statements are forgotten.</span></li>
+        <li><b>End with a clear ask or summary.</b><span>Don't trail off with "so, yeah." Finish with what you want people to do or remember.</span></li>
+      </ul>
+    </div>
+
+    <div class="card" id="tp-words">
+      <h2>Word choice</h2>
+      <div class="dodont">
+        <div class="col do"><span class="label">Say</span>
+          <p>"I recommend we launch in March."</p>
+          <p>"Here's what I found."</p>
+          <p>"Good question. Let me think."</p>
+          <p>(a short silent pause)</p>
+          <p>"I don't know yet. I'll find out by Friday."</p>
+        </div>
+        <div class="col dont"><span class="label">Instead of</span>
+          <p>"I just kind of think maybe we could launch in March?"</p>
+          <p>"Sorry, this might be a dumb idea, but..."</p>
+          <p>"Um, so, yeah, basically..."</p>
+          <p>"Like, you know, actually..."</p>
+          <p>"I'm not sure, I guess, it depends."</p>
+        </div>
+      </div>
+      <ul class="tips">
+        <li><b>Use plain words.</b><span>"Use" beats "utilize". If a 12-year-old wouldn't understand it, simplify it.</span></li>
+        <li><b>Cut hedges and apologies.</b><span>"Just", "maybe", "sort of" and "sorry" quietly tell people not to take you seriously.</span></li>
+        <li><b>Prefer active voice.</b><span>"We missed the deadline" is clearer and more honest than "the deadline was missed".</span></li>
+      </ul>
+    </div>
+
+    <div class="card" id="tp-body">
+      <h2>Body language</h2>
+      <ul class="tips">
+        <li><b>Stand or sit tall, feet flat.</b><span>Good posture opens your chest and lets you breathe properly, which steadies your voice.</span></li>
+        <li><b>One thought, one person.</b><span>Hold eye contact with one person for a sentence, about three to five seconds, then move to another.</span></li>
+        <li><b>Gesture between your shoulders and waist.</b><span>Open, purposeful gestures in that zone look natural. Rest your hands when you're not using them.</span></li>
+        <li><b>Smile at the start and the end.</b><span>It relaxes you and the room, and it changes the tone of your voice.</span></li>
+        <li><b>Stay still to make a point.</b><span>Pacing and swaying drain attention. Move with purpose, then plant your feet for key lines.</span></li>
+      </ul>
+    </div>
+
+    <div class="card" id="tp-nerves">
+      <h2>Handling nerves</h2>
+      <ul class="tips">
+        <li><b>Call it excitement.</b><span>Nerves and excitement feel the same in your body. Telling yourself "I'm excited" works better than "calm down".</span></li>
+        <li><b>Breathe out longer than you breathe in.</b><span>In for four, out for six, three times. It slows your heart rate within a minute.</span></li>
+        <li><b>Know your first 30 seconds cold.</b><span>Nerves peak at the start. A well-practiced opening carries you until they settle.</span></li>
+        <li><b>If you go blank, pause.</b><span>Take a sip of water, look at your notes, or repeat your last point. The audience barely notices a pause.</span></li>
+        <li><b>Focus on the listener, not yourself.</b><span>Ask "what do they need to hear?" instead of "how do I look?" It takes the pressure off.</span></li>
+      </ul>
+    </div>
+
+    <div class="card" id="tp-meetings">
+      <h2>Meetings and conversations</h2>
+      <ul class="tips">
+        <li><b>Listen to understand.</b><span>Before you reply, sum up what they said in one line: "So the worry is timing?" People feel heard and you avoid talking past each other.</span></li>
+        <li><b>Keep your turns under a minute.</b><span>Make your point, then invite a response. Long monologues lose the room.</span></li>
+        <li><b>Ask open questions.</b><span>"What would make this work for you?" gets far more than "Does this work?"</span></li>
+        <li><b>Disagree with "and", not "but".</b><span>"I see the cost saving, and I'm worried about the timeline" keeps people listening.</span></li>
+        <li><b>Use people's names.</b><span>It holds attention and makes the conversation feel personal.</span></li>
+      </ul>
+    </div>
+
+    <div class="card" id="tp-video">
+      <h2>Video calls</h2>
+      <ul class="tips">
+        <li><b>Camera at eye level.</b><span>Stack books under your laptop. Looking down into a camera reads as distant.</span></li>
+        <li><b>Look at the lens for key points.</b><span>To the other person, that is eye contact.</span></li>
+        <li><b>Light in front of you.</b><span>A window or lamp behind the screen, never behind you.</span></li>
+        <li><b>Use a headset or a decent mic.</b><span>Clear audio matters more than video quality.</span></li>
+        <li><b>Bring a little more energy.</b><span>Video flattens you. Speak slightly more expressively than you would in person.</span></li>
+      </ul>
+    </div>
+
+    <div class="card" id="tp-checklist">
+      <h2>Before an important talk</h2>
+      <div class="checklist">
+        <div><span class="label">The day before</span><ul><li>Say the whole thing out loud at least twice</li><li>Time it and cut anything that runs over</li><li>Write your first and last lines word for word</li><li>Guess three tough questions and prepare answers</li></ul></div>
+        <div><span class="label">An hour before</span><ul><li>Warm up: hum, tongue twisters, a few big yawns</li><li>Drink water, skip the extra coffee</li><li>Test your screen, slides and sound</li><li>Run through your opening once</li></ul></div>
+        <div><span class="label">A minute before</span><ul><li>Breathe in for four, out for six, three times</li><li>Roll your shoulders back, stand tall</li><li>Remind yourself of the one thing they must remember</li><li>Smile, pause, then begin</li></ul></div>
+      </div>
+    </div>
+  </section>
+
   <!-- HISTORY -->
   <section class="card">
     <div class="hist-head">
@@ -407,12 +539,13 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
   // ---------- tabs ----------
-  const tabs = [["tab-live", "panel-live"], ["tab-file", "panel-file"], ["tab-drills", "panel-drills"]];
+  const tabs = [["tab-live", "panel-live"], ["tab-file", "panel-file"], ["tab-drills", "panel-drills"], ["tab-tips", "panel-tips"]];
   function showTab(id) {
     tabs.forEach(([t, p]) => { const on = t === id; $(t).setAttribute("aria-selected", on); $(p).hidden = !on; });
     charts.forEach(([r, cv]) => drawChart(r, cv));
   }
   tabs.forEach(([t]) => $(t).addEventListener("click", () => showTab(t)));
+  document.querySelectorAll(".jump a").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); document.querySelector(a.getAttribute("href")).scrollIntoView({ behavior: "smooth", block: "start" }); }));
 
   // ---------- prompts ----------
   const PROMPTS = [
