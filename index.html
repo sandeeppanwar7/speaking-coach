@@ -218,7 +218,7 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
         <button class="seg-btn" id="modeTalk" aria-pressed="false">Answer a prompt</button>
       </div>
       <div id="readBox" class="read-box">
-        <div class="hist-head"><span class="label" id="passageTitle">Read this aloud</span><button class="btn" id="nextPassage">Next passage</button></div>
+        <div class="hist-head"><span class="label" id="passageTitle">Read this aloud</span><div class="drill-actions"><select id="passageCat" aria-label="Passage topic"><option value="All">All topics</option></select><button class="btn" id="nextPassage">Next passage</button></div></div>
         <div class="passage" id="passage"></div>
         <p class="note">Pause briefly at each <span class="pause-mark">/</span> and lean on the words in bold. Read it like you're talking to one person, not reciting.</p>
       </div>
@@ -398,6 +398,7 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
   <footer>Free and open source. Your recordings are analyzed in your browser and never uploaded. Live speech-to-text uses your browser's built-in speech service.</footer>
 </div>
 
+<script src="passages.js"></script>
 <script>
 (function () {
   const $ = (id) => document.getElementById(id);
@@ -438,19 +439,27 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
     ["Clear speech drill", "Red leather, yellow leather. / Clear, crisp consonants make *every* word count. / She sells seashells by the seashore, / and the shells she sells are *surely* seashells. / Practice speaking from your chest, / not your throat. / Open your mouth a little *wider* than feels natural. / Finish the *final* sound of every word, / especially the t, the d, and the k. / Think of the last row of the room, / and send your voice *there*. / Slow down on the *long* words. / Do not rush the short ones either. / Now read this paragraph one more time, / a little *slower*, / and notice how much *stronger* you sound."],
     ["A quick pitch", "Every week, our team spends *hours* on the same report. / We copy numbers from four different tools, / paste them into a spreadsheet, / and fix the mistakes by hand. / I think we can get that time *back*. / Here is my idea. / We connect those four tools *once*, / and build a simple dashboard that updates on its own. / No copying, / no pasting, / and far fewer mistakes. / I have already built a rough version, / and it took me *one* afternoon. / If we spend two more weeks on it, / I believe we save at least *five* hours a week across the team. / That is more than *two hundred* hours a year. / I would love *ten* minutes on Friday / to show you how it works."],
   ];
-  // Shuffle bag: every passage comes up once, in random order, before any repeats.
-  function makeBag(n) {
-    let bag = [];
-    return (cur) => {
-      if (!bag.length) {
-        bag = [...Array(n).keys()].filter((i) => i !== cur);
-        for (let i = bag.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [bag[i], bag[j]] = [bag[j], bag[i]]; }
-      }
-      return bag.pop();
-    };
+  const BASE_CATS = ["Work updates", "Explaining", "Stories", "Presentations", "Speeches", "Persuasion"];
+  PASSAGES.forEach((p, i) => { p[2] = BASE_CATS[i]; });
+  (window.EXTRA_PASSAGES || []).forEach((p) => PASSAGES.push(p));
+  const CATEGORIES = [...new Set(PASSAGES.map((p) => p[2]))].sort();
+
+  // Shuffle bag per topic: every passage in the topic comes up once, in random order, before any repeats.
+  const bags = {};
+  function nextIdx(cur, cat, key) {
+    const k = key + "|" + cat;
+    if (!bags[k] || !bags[k].length) {
+      const bag = PASSAGES.map((_, i) => i).filter((i) => (cat === "All" || PASSAGES[i][2] === cat) && i !== cur);
+      for (let i = bag.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [bag[i], bag[j]] = [bag[j], bag[i]]; }
+      bags[k] = bag;
+    }
+    return bags[k].length ? bags[k].pop() : cur;
   }
-  const nextReadPassage = makeBag(PASSAGES.length);
-  let passageIdx = nextReadPassage(-1), mode = "read";
+  let readCat = "All";
+  let passageIdx = nextIdx(-1, readCat, "read"), mode = "read";
+  CATEGORIES.forEach((c) => { const o = document.createElement("option"); o.value = c; o.textContent = `${c} (${PASSAGES.filter((p) => p[2] === c).length})`; $("passageCat").appendChild(o); });
+  $("passageCat").options[0].textContent = `All topics (${PASSAGES.length})`;
+  $("passageCat").onchange = (e) => { readCat = e.target.value; passageIdx = nextIdx(-1, readCat, "read"); renderPassage(); };
   const scriptText = () => PASSAGES[passageIdx][1];
   function renderPassage(missedSet) {
     let wi = 0;
@@ -465,7 +474,7 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
     $("passage").innerHTML = html;
     $("passageTitle").textContent = "Read this aloud · " + PASSAGES[passageIdx][0];
   }
-  $("nextPassage").onclick = () => { passageIdx = nextReadPassage(passageIdx); renderPassage(); };
+  $("nextPassage").onclick = () => { passageIdx = nextIdx(passageIdx, readCat, "read"); renderPassage(); };
   function setMode(m) {
     mode = m;
     $("modeRead").setAttribute("aria-pressed", m === "read"); $("modeTalk").setAttribute("aria-pressed", m === "talk");
@@ -476,7 +485,18 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
   $("modeTalk").onclick = () => setMode("talk");
 
   // word-level alignment (longest common subsequence) of what was said against the script
+  const ONES = "zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen".split(" ");
+  const TENS = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
+  function numWords(n) {
+    if (n < 20) return ONES[n];
+    if (n < 100) return TENS[Math.floor(n / 10)] + (n % 10 ? " " + ONES[n % 10] : "");
+    if (n < 1000) return ONES[Math.floor(n / 100)] + " hundred" + (n % 100 ? " " + numWords(n % 100) : "");
+    if (n < 1e6) return numWords(Math.floor(n / 1000)) + " thousand" + (n % 1000 ? " " + numWords(n % 1000) : "");
+    return String(n);
+  }
+  const spellNumbers = (t) => t.replace(/\d[\d,]*/g, (m) => numWords(Number(m.replace(/,/g, "")))).replace(/%/g, " percent");
   function alignScript(script, said) {
+    said = spellNumbers(said);
     const norm = (t) => wordsOf(t.replace(/'/g, ""));
     const a = norm(script), b = norm(said), n = a.length, m = b.length;
     const T = new Uint16Array((n + 1) * (m + 1)), W = m + 1;
@@ -1090,8 +1110,7 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
   $("twisterNext").onclick = () => { twIdx = (twIdx + 1) % TWISTERS.length; showTwister(); };
 
   // pace trainer: highlights one word at a time at the chosen speed, with a short hold at each "/"
-  const nextPacePassage = makeBag(PASSAGES.length);
-  let paceIdx = nextPacePassage(-1), paceTimer = null;
+  let paceIdx = nextIdx(-1, "All", "pace"), paceTimer = null;
   function paceRender() {
     $("paceText").classList.remove("running");
     $("paceText").innerHTML = PASSAGES[paceIdx][1].split(/\s+/).map((t) => t === "/" ? '<span class="pause-mark">/</span>' : `<span class="pw">${esc(t).replace(/\*(.+?)\*/g, "<strong>$1</strong>")}</span>`).join(" ");
@@ -1115,7 +1134,7 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
     };
     step();
   };
-  $("paceNext").onclick = () => { paceStop(); paceIdx = nextPacePassage(paceIdx); paceRender(); };
+  $("paceNext").onclick = () => { paceStop(); paceIdx = nextIdx(paceIdx, "All", "pace"); paceRender(); };
 
   // one minute, no fillers
   const TOPICS = ["Your favourite place to eat, and why.", "The best advice anyone ever gave you.", "How you would spend a free Saturday.", "A skill you'd love to learn this year.", "What makes a good manager.", "A movie or show everyone should watch.", "The hardest part of your job.", "Your morning routine.", "A city you'd love to live in.", "Something you changed your mind about.", "How to make a good first impression.", "Why people should read more."];

@@ -4,6 +4,7 @@ A free, single-page web app for practicing speaking out loud. Read a passage or 
 
 - **Pace**: words per minute (target 130–160)
 - **Filler words**: um, uh, like, you know, basically… per minute
+- **106 read-aloud passages** across 10 topics (work updates, interviews, presentations, stories, small talk and more), in random order
 - **Reading accuracy**: words you skipped or didn't say clearly
 - **Pitch range**: whether you sound expressive or monotone
 - **Pauses**: how often and how long you pause
@@ -39,7 +40,7 @@ Everything is in one file, `index.html`, with no build step and no dependencies.
 
 ## Contributing
 
-Issues and pull requests are welcome. Ideas: more passages, more languages, better pitch tracking.
+Issues and pull requests are welcome. To add passages, edit `passages.js`. Other ideas: more languages, better pitch tracking.
 
 ## License
 
