@@ -1,0 +1,862 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Speaking Coach</title>
+<meta name="description" content="Practice speaking out loud and get scored on pace, filler words, reading accuracy, pitch range, pauses and volume. Free and open source.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: one narrow working column; mode tabs on top, scorecard of gauge rows below, history last. */
+:root {
+  --bg: #F2F5F7; --surface: #FFFFFF; --ink: #15202A; --muted: #5A6774; --line: #D8E0E7;
+  --accent: #0B7A75; --accent-ink: #FFFFFF; --band: #CBE8E3;
+  --good: #2C7A4B; --warn: #A86B12; --bad: #B33A3A;
+  --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --body: "Atkinson Hyperlegible", system-ui, -apple-system, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0E141A; --surface: #161F28; --ink: #E5ECF2; --muted: #95A3B0; --line: #2A3743;
+  --accent: #3CC0B3; --accent-ink: #062523; --band: #1B4643;
+  --good: #5CC08A; --warn: #E2A94C; --bad: #E87070; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0E141A; --surface: #161F28; --ink: #E5ECF2; --muted: #95A3B0; --line: #2A3743;
+  --accent: #3CC0B3; --accent-ink: #062523; --band: #1B4643;
+  --good: #5CC08A; --warn: #E2A94C; --bad: #E87070; color-scheme: dark }
+
+* { box-sizing: border-box }
+[hidden] { display: none !important }
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px) }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.55 var(--body) }
+.voice-block { display: grid; gap: 14px; border-top: 1px solid var(--line); padding-top: 18px }
+footer { color: var(--muted); font-size: 14px; text-align: center }
+footer a { color: var(--accent) }
+.wrap { max-width: 860px; margin: 0 auto; padding-block: 28px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 28px }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.15 }
+h1 { font-size: clamp(30px, 6vw, 44px); font-weight: 800; letter-spacing: -0.02em }
+h2 { font-size: 22px; font-weight: 600 }
+h3 { font-size: 17px; font-weight: 600 }
+p { margin: 0 }
+.lede { color: var(--muted); max-width: 62ch; margin-top: 8px }
+.label { font: 700 12px/1 var(--body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted) }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums }
+
+.tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--line); flex-wrap: wrap }
+.tab { font: 700 15px var(--body); color: var(--muted); background: none; border: 0; padding: 10px 14px;
+  border-bottom: 3px solid transparent; cursor: pointer; margin-bottom: -1px }
+.tab[aria-selected="true"] { color: var(--ink); border-color: var(--accent) }
+.tab:focus-visible, button:focus-visible, textarea:focus-visible, input:focus-visible, .drop:focus-within { outline: 3px solid var(--accent); outline-offset: 2px }
+
+.panel { display: grid; gap: 20px }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px; display: grid; gap: 14px; min-width: 0 }
+
+.prompt { display: flex; gap: 12px; align-items: center; flex-wrap: wrap }
+.prompt q { font: 600 19px/1.35 var(--display); flex: 1 1 320px; quotes: "\201C" "\201D" }
+
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 3px; gap: 3px; justify-self: start; flex-wrap: wrap }
+.seg-btn { font: 700 14px var(--body); border: 0; border-radius: 999px; padding: 8px 16px; background: none; color: var(--muted); cursor: pointer }
+.seg-btn[aria-pressed="true"] { background: var(--ink); color: var(--bg) }
+.read-box { display: grid; gap: 10px }
+.passage { font: 400 20px/1.75 var(--body); max-width: 62ch; padding: 18px 20px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; overflow-wrap: anywhere }
+.passage strong { font-weight: 700; color: var(--ink) }
+.passage .missed { color: var(--bad); text-decoration: line-through; text-decoration-thickness: 2px }
+.pause-mark { color: var(--accent); font-weight: 700; margin: 0 2px }
+.btn { font: 700 15px var(--body); border-radius: 999px; padding: 11px 20px; cursor: pointer; border: 1px solid var(--line); background: var(--surface); color: var(--ink) }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent) }
+.btn:disabled { opacity: .5; cursor: default }
+.rec { display: inline-flex; align-items: center; gap: 10px; font-size: 17px; padding: 14px 26px }
+.rec .dot { width: 12px; height: 12px; border-radius: 50%; background: currentColor }
+.rec.live .dot { animation: pulse 1s ease-in-out infinite }
+@keyframes pulse { 50% { opacity: .25 } }
+@media (prefers-reduced-motion: reduce) { .rec.live .dot { animation: none } }
+.controls { display: flex; align-items: center; gap: 16px; flex-wrap: wrap }
+.timer { font: 700 28px var(--mono) }
+.status { color: var(--muted); font-size: 14px }
+.transcript { min-height: 90px; max-height: 240px; overflow-y: auto; padding: 14px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); white-space: pre-wrap; overflow-wrap: anywhere }
+.transcript .partial { color: var(--muted) }
+.transcript mark { background: none; color: var(--warn); font-weight: 700; text-decoration: underline wavy; text-underline-offset: 3px }
+details summary { cursor: pointer; font-weight: 700; color: var(--accent) }
+details .paste { display: grid; gap: 10px; margin-top: 12px }
+textarea, input[type="number"] { font: 15px/1.5 var(--body); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; width: 100% }
+textarea { min-height: 120px; resize: vertical }
+.inline { display: flex; gap: 10px; align-items: center; flex-wrap: wrap }
+.inline input { width: 120px }
+.note { font-size: 14px; color: var(--muted) }
+.example-flag { display: inline-block; font: 700 12px var(--body); letter-spacing: .06em; text-transform: uppercase; color: var(--warn); border: 1px solid var(--warn); border-radius: 999px; padding: 3px 10px }
+
+.score-head { display: flex; gap: 20px; align-items: center; flex-wrap: wrap }
+.ring { width: 112px; height: 112px; flex: none }
+.ring circle { fill: none; stroke-width: 10 }
+.ring .track { stroke: var(--line) }
+.ring .val { stroke: var(--accent); stroke-linecap: round; transform: rotate(-90deg); transform-origin: 50% 50%; transition: stroke-dashoffset .6s ease }
+.ring text { fill: var(--ink); font: 700 30px var(--mono); text-anchor: middle; dominant-baseline: central }
+.score-head .sum { flex: 1 1 260px; display: grid; gap: 6px; min-width: 0 }
+
+.metrics { display: grid; gap: 0 }
+.metric { display: grid; grid-template-columns: minmax(150px, 1.1fr) minmax(0, 1.6fr) auto; gap: 6px 18px; align-items: center; padding: 14px 0; border-top: 1px solid var(--line) }
+.metric:first-child { border-top: 0 }
+.metric .name { font-weight: 700 }
+.metric .val { font: 700 22px var(--mono); font-variant-numeric: tabular-nums }
+.metric .val small { font: 500 13px var(--body); color: var(--muted); margin-left: 4px }
+.metric .tip { grid-column: 1 / -1; font-size: 14px; color: var(--muted) }
+.gauge { position: relative; height: 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 999px }
+.gauge .band { position: absolute; top: 0; bottom: 0; background: var(--band); border-radius: 999px }
+.gauge .mark { position: absolute; top: -5px; width: 4px; height: 18px; margin-left: -2px; border-radius: 2px; background: var(--ink) }
+.gauge-scale { display: flex; justify-content: space-between; font: 500 11px var(--mono); color: var(--muted); margin-top: 4px }
+.chip { font: 700 12px var(--body); letter-spacing: .04em; text-transform: uppercase; padding: 4px 10px; border-radius: 999px; border: 1px solid currentColor; white-space: nowrap; justify-self: end }
+.chip.good { color: var(--good) } .chip.warn { color: var(--warn) } .chip.bad { color: var(--bad) }
+@media (max-width: 560px) {
+  .metric { grid-template-columns: 1fr auto }
+  .metric .gwrap { grid-column: 1 / -1; order: 3 }
+  .metric .tip { order: 4 }
+}
+
+.leaned { display: flex; gap: 8px; flex-wrap: wrap }
+.leaned span { font: 500 13px var(--mono); padding: 4px 10px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line) }
+
+.coach { display: grid; gap: 10px }
+.coach-out { line-height: 1.6; overflow-wrap: anywhere }
+.coach-out h4 { font: 600 16px var(--display); margin: 14px 0 4px }
+.coach-out ul { margin: 0; padding-left: 20px; display: grid; gap: 4px }
+
+.drop { display: grid; place-items: center; text-align: center; gap: 10px; padding: 34px 18px; border: 2px dashed var(--line); border-radius: 14px; cursor: pointer; background: var(--surface) }
+.drop.over { border-color: var(--accent); background: var(--band) }
+.drop input { position: absolute; width: 1px; height: 1px; opacity: 0 }
+.measures { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px 20px; font-size: 14px; color: var(--muted) }
+.measures b { color: var(--ink); display: block }
+
+.chart-wrap { display: grid; gap: 8px }
+canvas { width: 100%; height: 170px; display: block; border-radius: 10px; background: var(--bg) }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--muted) }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 6px }
+
+.table-wrap { overflow-x: auto }
+table { width: 100%; border-collapse: collapse; font-size: 14px }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap }
+th { font: 700 12px var(--body); letter-spacing: .06em; text-transform: uppercase; color: var(--muted) }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums }
+.hist-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>Speaking Coach</h1>
+    <p class="lede">Read a passage or answer a prompt out loud, then see your pace, filler words, pitch and pauses scored against the ranges good speakers fall into. Each run is saved to your history in this browser so you can watch the numbers move.</p>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab" role="tab" id="tab-live" aria-selected="true" aria-controls="panel-live">Speak live</button>
+    <button class="tab" role="tab" id="tab-file" aria-selected="false" aria-controls="panel-file">Analyze a recording</button>
+  </nav>
+
+  <!-- LIVE -->
+  <section class="panel" id="panel-live" role="tabpanel" aria-labelledby="tab-live">
+    <div class="card">
+      <div class="seg" role="group" aria-label="Practice type">
+        <button class="seg-btn" id="modeRead" aria-pressed="true">Read a passage</button>
+        <button class="seg-btn" id="modeTalk" aria-pressed="false">Answer a prompt</button>
+      </div>
+      <div id="readBox" class="read-box">
+        <div class="hist-head"><span class="label" id="passageTitle">Read this aloud</span><button class="btn" id="nextPassage">Next passage</button></div>
+        <div class="passage" id="passage"></div>
+        <p class="note">Pause briefly at each <span class="pause-mark">/</span> and lean on the words in bold. Read it like you're talking to one person, not reciting.</p>
+      </div>
+      <div id="talkBox" hidden>
+        <span class="label">Your prompt</span>
+        <div class="prompt">
+          <q id="promptText">What do you do at work, and why does it matter?</q>
+          <button class="btn" id="newPrompt">New prompt</button>
+        </div>
+      </div>
+      <div class="controls">
+        <button class="btn primary rec" id="recBtn"><span class="dot"></span><span id="recLabel">Start speaking</span></button>
+        <span class="timer mono" id="timer">0:00</span>
+        <span class="status" id="recStatus">Aim for 60 to 90 seconds.</span>
+      </div>
+      <div class="transcript" id="transcript" aria-live="polite"></div>
+      <details id="pasteBox">
+        <summary>Or paste a transcript instead</summary>
+        <div class="paste">
+          <p class="note">Use this if live speech isn't available in your browser (it needs Chrome, Edge or Safari). Dictate with your phone or computer's dictation, paste the text, and enter how long you spoke.</p>
+          <textarea id="pasteText" placeholder="Paste what you said..."></textarea>
+          <div class="inline">
+            <label for="pasteSecs">Seconds spoken</label>
+            <input type="number" id="pasteSecs" min="5" max="3600" value="60">
+            <button class="btn primary" id="pasteGo">Score it</button>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <div class="card" id="liveResults"></div>
+
+    <div class="card coach" id="coachCard">
+      <div class="hist-head">
+        <h2>Get coaching from an AI</h2>
+        <button class="btn primary" id="coachBtn">Copy coaching prompt</button>
+      </div>
+      <p class="note" id="coachNote">Copies your transcript and scores as a ready-made prompt. Paste it into Claude or any AI chat to get specific fixes and a drill for tomorrow.</p>
+      <div class="coach-out" id="coachOut"></div>
+    </div>
+  </section>
+
+  <!-- FILE -->
+  <section class="panel" id="panel-file" role="tabpanel" aria-labelledby="tab-file" hidden>
+    <label class="drop" id="drop">
+      <input type="file" id="fileIn" accept="audio/*,.m4a,.mp3,.wav,.webm,.ogg,.aac">
+      <h2>Drop a recording here</h2>
+      <p class="note">Record 1 to 3 minutes in Voice Memos or QuickTime, then drop the file here or click to choose it. M4A, MP3 and WAV work. The audio is analyzed in your browser and never uploaded.</p>
+      <span class="btn primary">Choose a file</span>
+    </label>
+    <div class="card">
+      <span class="label">What a recording adds</span>
+      <div class="measures">
+        <div><b>Pitch range</b>How much your voice rises and falls, in semitones. A narrow range sounds monotone.</div>
+        <div><b>Pauses</b>How often you pause and how long. Short pauses sound confident; long gaps lose people.</div>
+        <div><b>Volume</b>Whether your energy stays even, and whether you trail off at the end of sentences.</div>
+        <div><b>Pace</b>Estimated words per minute, counted from syllables in the audio.</div>
+      </div>
+    </div>
+    <div class="card" id="fileResults" hidden></div>
+  </section>
+
+  <!-- HISTORY -->
+  <section class="card">
+    <div class="hist-head">
+      <h2>Your progress</h2>
+      <button class="btn" id="clearHist" hidden>Clear history</button>
+    </div>
+    <div id="history"></div>
+  </section>
+
+  <footer>Free and open source. Your recordings are analyzed in your browser and never uploaded. Live speech-to-text uses your browser's built-in speech service.</footer>
+</div>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  const fmtTime = (s) => Math.floor(s / 60) + ":" + String(Math.floor(s % 60)).padStart(2, "0");
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+  // ---------- tabs ----------
+  const tabs = [["tab-live", "panel-live"], ["tab-file", "panel-file"]];
+  function showTab(id) {
+    tabs.forEach(([t, p]) => { const on = t === id; $(t).setAttribute("aria-selected", on); $(p).hidden = !on; });
+    charts.forEach(([r, cv]) => drawChart(r, cv));
+  }
+  tabs.forEach(([t]) => $(t).addEventListener("click", () => showTab(t)));
+
+  // ---------- prompts ----------
+  const PROMPTS = [
+    "What do you do at work, and why does it matter?",
+    "Give a one-minute update on a project you're working on.",
+    "Describe a problem you solved recently and how you did it.",
+    "Explain your company to someone who has never heard of it.",
+    "Disagree politely with a decision your manager made.",
+    "Tell a short story about a mistake you learned from.",
+    "Pitch an idea that would save your team time.",
+    "Introduce yourself at the start of a client call.",
+    "What's one thing you'd change about how meetings run, and why?",
+    "Explain a technical topic you know well to a beginner.",
+  ];
+  let promptIdx = 0;
+  $("newPrompt").onclick = () => { promptIdx = (promptIdx + 1 + Math.floor(Math.random() * (PROMPTS.length - 1))) % PROMPTS.length; $("promptText").textContent = PROMPTS[promptIdx]; };
+
+  // ---------- reading passages: "/" marks a pause, *word* marks stress ----------
+  const PASSAGES = [
+    ["Team update", "Good morning, everyone. / Quick update on the *spring* campaign. / We sent the first email on Tuesday, / and the results are *better* than we expected. / More than a third of people opened it, / and the click rate was *twice* our usual number. / The subject line did most of the work. / It was short, / it was specific, / and it asked a question. / Next week we will test the *same* idea on social. / If it holds up there, / I want to make it our default approach. / The one risk is timing. / We need design support by *Thursday*, / or the posts slip to the following week. / So my ask today is simple. / Can someone from design give me *two* hours this week? / That is all it takes to keep us on track."],
+    ["Explaining a big decision", "Buying your first home is one of the *biggest* decisions you will ever make, / and most people do it with very little help. / They talk to *one* lender, / accept the first rate they are offered, / and hope for the best. / That is where things go wrong. / A small difference in your rate / can add up to *thousands* of dollars over the life of a loan. / So before you sign anything, / ask three questions. / What is my *total* cost, not just my monthly payment? / What happens if I want to move in five years? / And what *other* options should I be looking at? / A good advisor will answer all three / without making you feel rushed. / If they cannot, / that tells you *everything* you need to know."],
+    ["A short story", "The first time I gave a presentation at work, / I was *terrified*. / I had practiced for a week, / but the moment I stood up, / my mind went completely *blank*. / I looked down at my notes / and the words just swam on the page. / So I did the only thing I could think of. / I *stopped*. / I took one slow breath, / looked at the person in the front row, / and said, / let me start with the part I care about most. / And then I just *talked*. / Not perfectly, / but honestly. / Afterward, my manager told me it was the *best* part of the meeting. / I learned something that day. / People do not need you to be perfect. / They need you to be *clear*, / and they need you to *mean* it."],
+    ["Opening a presentation", "Thank you all for being here. / I know your time is *valuable*, / so I will get straight to the point. / Over the last three months, / our team has been asking one question. / Why do *good* customers leave? / Not the ones who were never a fit, / but the ones who *liked* us. / What we found surprised us. / It was not price, / and it was not the product. / It was *silence*. / After the first month, / we simply stopped talking to them. / Today I will show you what we learned, / what we have *already* changed, / and what we need from each of you / to make sure it does not happen again. / Let us start with the numbers."],
+    ["Clear speech drill", "Red leather, yellow leather. / Clear, crisp consonants make *every* word count. / She sells seashells by the seashore, / and the shells she sells are *surely* seashells. / Practice speaking from your chest, / not your throat. / Open your mouth a little *wider* than feels natural. / Finish the *final* sound of every word, / especially the t, the d, and the k. / Think of the last row of the room, / and send your voice *there*. / Slow down on the *long* words. / Do not rush the short ones either. / Now read this paragraph one more time, / a little *slower*, / and notice how much *stronger* you sound."],
+    ["A quick pitch", "Every week, our team spends *hours* on the same report. / We copy numbers from four different tools, / paste them into a spreadsheet, / and fix the mistakes by hand. / I think we can get that time *back*. / Here is my idea. / We connect those four tools *once*, / and build a simple dashboard that updates on its own. / No copying, / no pasting, / and far fewer mistakes. / I have already built a rough version, / and it took me *one* afternoon. / If we spend two more weeks on it, / I believe we save at least *five* hours a week across the team. / That is more than *two hundred* hours a year. / I would love *ten* minutes on Friday / to show you how it works."],
+  ];
+  let passageIdx = 0, mode = "read";
+  const scriptText = () => PASSAGES[passageIdx][1];
+  function renderPassage(missedSet) {
+    let wi = 0;
+    const html = scriptText().split(/\s+/).map((tok) => {
+      if (tok === "/") return '<span class="pause-mark">/</span>';
+      const n = wordsOf(tok.replace(/'/g, "")).length;
+      const missed = missedSet && [...Array(n).keys()].some((k) => missedSet.has(wi + k));
+      wi += n;
+      let h = esc(tok).replace(/\*(.+?)\*/g, "<strong>$1</strong>");
+      return missed ? `<span class="missed">${h}</span>` : h;
+    }).join(" ");
+    $("passage").innerHTML = html;
+    $("passageTitle").textContent = "Read this aloud · " + PASSAGES[passageIdx][0];
+  }
+  $("nextPassage").onclick = () => { passageIdx = (passageIdx + 1) % PASSAGES.length; renderPassage(); };
+  function setMode(m) {
+    mode = m;
+    $("modeRead").setAttribute("aria-pressed", m === "read"); $("modeTalk").setAttribute("aria-pressed", m === "talk");
+    $("readBox").hidden = m !== "read"; $("talkBox").hidden = m !== "talk";
+    $("recStatus").textContent = m === "read" ? "Read the passage at a natural pace." : "Aim for 60 to 90 seconds.";
+  }
+  $("modeRead").onclick = () => setMode("read");
+  $("modeTalk").onclick = () => setMode("talk");
+
+  // word-level alignment (longest common subsequence) of what was said against the script
+  function alignScript(script, said) {
+    const norm = (t) => wordsOf(t.replace(/'/g, ""));
+    const a = norm(script), b = norm(said), n = a.length, m = b.length;
+    const T = new Uint16Array((n + 1) * (m + 1)), W = m + 1;
+    for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--)
+      T[i * W + j] = a[i] === b[j] ? T[(i + 1) * W + j + 1] + 1 : Math.max(T[(i + 1) * W + j], T[i * W + j + 1]);
+    const missed = new Set(); let i = 0, j = 0;
+    while (i < n) {
+      if (j < m && a[i] === b[j]) { i++; j++; }
+      else if (j < m && T[i * W + j + 1] >= T[(i + 1) * W + j]) j++;
+      else { missed.add(i); i++; }
+    }
+    return { total: n, matched: n - missed.size, missed, missedWords: [...missed].map((k) => a[k]) };
+  }
+
+  // ---------- gauge + scoring helpers ----------
+  function bandScore(v, lo, hi, perUnit) {
+    if (v >= lo && v <= hi) return 100;
+    const d = v < lo ? lo - v : v - hi;
+    return clamp(Math.round(100 - d * perUnit), 0, 100);
+  }
+  function verdict(score) { return score >= 80 ? ["good", "On target"] : score >= 50 ? ["warn", "Work on it"] : ["bad", "Focus here"]; }
+  function metricRow(m) {
+    const span = m.max - m.min;
+    const pct = (v) => clamp(((v - m.min) / span) * 100, 0, 100);
+    const [cls, word] = m.chip || verdict(m.score);
+    const gauge = m.value == null ? '<p class="note">Not enough data</p>' :
+      `<div class="gauge" role="img" aria-label="${esc(m.name)} ${esc(m.display)}, target ${m.lo} to ${m.hi}">
+        <div class="band" style="left:${pct(m.lo)}%;width:${pct(m.hi) - pct(m.lo)}%"></div>
+        <div class="mark" style="left:${pct(m.value)}%"></div></div>
+       <div class="gauge-scale"><span>${m.min}</span><span>target ${m.lo}–${m.hi}${m.unit ? " " + esc(m.unit) : ""}</span><span>${m.max}</span></div>`;
+    return `<div class="metric">
+      <div><div class="name">${esc(m.name)}</div><div class="val">${esc(m.display)}<small>${esc(m.unit || "")}</small></div></div>
+      <div class="gwrap">${gauge}</div>
+      <span class="chip ${cls}">${word}</span>
+      <p class="tip">${esc(m.tip)}</p></div>`;
+  }
+  function ring(score) {
+    const c = 2 * Math.PI * 46;
+    return `<svg class="ring" viewBox="0 0 112 112" role="img" aria-label="Overall score ${score} out of 100">
+      <circle class="track" cx="56" cy="56" r="46"></circle>
+      <circle class="val" cx="56" cy="56" r="46" stroke-dasharray="${c}" stroke-dashoffset="${c * (1 - score / 100)}"></circle>
+      <text x="56" y="56">${score}</text></svg>`;
+  }
+
+  // ---------- transcript analysis ----------
+  const FILLERS = [
+    ["um", /\b(?:u+m+|e+r+m+|h+m+)\b/gi],
+    ["uh", /\b(?:u+h+|e+r+|a+h+)\b/gi],
+    ["like", /(?:^|[,.!?]\s*)like\b|\blike(?=,)/gim],
+    ["you know", /\byou know\b(?!\s+(?:what|how|that|why|when|where|who))/gi],
+    ["I mean", /\bi mean\b/gi],
+    ["basically", /\bbasically\b/gi],
+    ["actually", /\bactually\b/gi],
+    ["literally", /\bliterally\b/gi],
+    ["kind of / sort of", /\b(?:kind|sort) of\b/gi],
+    ["so (to start)", /(?:^|[.!?]\s+)so\b/gim],
+    ["right?", /\bright\?/gi],
+  ];
+  const STOP = new Set("the a an and or but so to of in on at for with is are was were be been it its this that these those i we you they he she my our your their me us them as by from not no do does did have has had will would can could should just very really there here what which who when where how than then also about into out up if all more some any one".split(" "));
+  const wordsOf = (t) => t.toLowerCase().match(/[a-z0-9']+/g) || [];
+
+  function analyzeText(text, seconds, script) {
+    const words = wordsOf(text);
+    const n = words.length, mins = seconds / 60;
+    const wpm = mins > 0 ? Math.round(n / mins) : 0;
+    const fillerHits = [];
+    FILLERS.forEach(([name, re]) => { const c = (text.match(re) || []).length; if (c) fillerHits.push([name, c]); });
+    const fillers = fillerHits.reduce((a, [, c]) => a + c, 0);
+    const fpm = mins > 0 ? fillers / mins : 0;
+    const sentences = text.split(/[.!?]+/).map((s) => s.trim()).filter((s) => wordsOf(s).length > 0);
+    const punctuated = sentences.length >= 2 || n < 30;
+    const avgSent = punctuated ? n / Math.max(1, sentences.length) : null;
+    let variety;
+    const W = 40;
+    if (n < W) variety = n ? new Set(words).size / n : 0;
+    else { let s = 0, k = 0; for (let i = 0; i + W <= n; i++) { s += new Set(words.slice(i, i + W)).size / W; k++; } variety = s / k; }
+    const counts = {};
+    words.forEach((w) => { if (!STOP.has(w) && w.length > 2) counts[w] = (counts[w] || 0) + 1; });
+    const leaned = Object.entries(counts).filter(([, c]) => c >= 3 && c / n >= 0.02).sort((a, b) => b[1] - a[1]).slice(0, 6);
+
+    const paceScore = bandScore(wpm, 130, 160, 2);
+    const fillScore = clamp(Math.round(100 - Math.max(0, fpm - 2) * 15), 0, 100);
+    const sentScore = avgSent == null ? null : bandScore(avgSent, 10, 20, 5);
+    const varScore = bandScore(variety * 100, 72, 100, 3);
+    const align = script ? alignScript(script, text) : null;
+    const accuracy = align ? Math.round((align.matched / align.total) * 100) : null;
+    const accScore = align ? bandScore(accuracy, 95, 100, 5) : null;
+    const parts = align ? [[paceScore, 40], [fillScore, 25], [accScore, 35]]
+      : [[paceScore, 35], [fillScore, 30], [varScore, 20]].concat(sentScore == null ? [] : [[sentScore, 15]]);
+    const overall = Math.round(parts.reduce((a, [s, w]) => a + s * w, 0) / parts.reduce((a, [, w]) => a + w, 0));
+
+    const metrics = [
+      { name: "Pace", value: wpm, display: String(wpm), unit: "wpm", min: 60, max: 240, lo: 130, hi: 160, score: paceScore,
+        chip: wpm > 160 ? (paceScore >= 50 ? ["warn", "A bit fast"] : ["bad", "Too fast"]) : wpm < 130 ? (paceScore >= 50 ? ["warn", "A bit slow"] : ["bad", "Too slow"]) : null,
+        tip: wpm > 160 ? "Slow down. Pause for a full breath after each main point, and stress one word per sentence." :
+             wpm < 130 ? "Pick up the pace a little. Know your next point before you finish the current one." :
+             "A comfortable pace that's easy to follow." },
+      { name: "Filler words", value: Math.round(fpm * 10) / 10, display: (Math.round(fpm * 10) / 10).toFixed(1), unit: "per min", min: 0, max: 12, lo: 0, hi: 2, score: fillScore,
+        tip: fillers ? "Found: " + fillerHits.map(([k, c]) => `${k} ×${c}`).join(", ") + ". Replace each one with a silent pause." : "No filler words detected. Speech-to-text can drop \"um\" and \"uh\", so a recording is a stricter check." },
+      { name: "Sentence length", value: avgSent == null ? null : Math.round(avgSent), display: avgSent == null ? "n/a" : String(Math.round(avgSent)), unit: avgSent == null ? "" : "words", min: 0, max: 40, lo: 10, hi: 20, score: sentScore ?? 0,
+        chip: avgSent == null ? ["warn", "No punctuation"] : null,
+        tip: avgSent == null ? "The transcript has no sentence breaks, so this couldn't be measured." :
+             avgSent > 20 ? "Your sentences run long. Break them up: one idea per sentence, then stop." :
+             avgSent < 10 ? "Very short sentences can sound choppy. Join related ideas with \"because\" or \"which means\"." :
+             "Sentences are a good length to follow by ear." },
+      { name: "Word variety", value: Math.round(variety * 100), display: Math.round(variety * 100) + "%", unit: "", min: 40, max: 100, lo: 72, hi: 100, score: varScore,
+        tip: leaned.length ? "You leaned on a few words; see the list below. Have one or two alternatives ready for each." : "Good range of vocabulary for spoken English." },
+    ];
+    if (align) {
+      const uniqMissed = [...new Set(align.missedWords)].slice(0, 8);
+      metrics.splice(2, 2, { name: "Reading accuracy", value: accuracy, display: accuracy + "%", unit: "", min: 60, max: 100, lo: 95, hi: 100, score: accScore,
+        tip: align.missed.size ? `${align.missed.size} of ${align.total} words were skipped or not heard clearly (crossed out in the passage above): ${uniqMissed.join(", ")}. Slow down on those and finish each word's last sound.` : "Every word came through clearly." });
+      metrics[1].tip = fillers ? "Found: " + fillerHits.map(([k, c]) => `${k} ×${c}`).join(", ") + ". None of these are in the passage, so they're habits slipping in." : "No filler words slipped in.";
+    }
+    return { kind: "live", text, seconds, n, wpm, fpm, fillers, avgSent, variety, leaned: align ? [] : leaned, metrics, overall, align, accuracy, script };
+  }
+
+  function highlight(text) {
+    let html = esc(text);
+    const re = /\b(um+|uh+|erm+|er+|ah+|hmm+|basically|actually|literally|you know|i mean|kind of|sort of)\b/gi;
+    return html.replace(re, "<mark>$1</mark>");
+  }
+
+  function renderLive(r, isExample) {
+    const head = isExample
+      ? `<span class="example-flag">Example session</span><p class="note">This is a sample result so you can see the scorecard. Press Start speaking to replace it with your own.</p>`
+      : `<p class="note">${r.n} words in ${fmtTime(r.seconds)}.</p>`;
+    const weakest = r.metrics.filter((m) => m.value != null).sort((a, b) => a.score - b.score)[0];
+    $("liveResults").innerHTML = `
+      <div class="score-head">${ring(r.overall)}
+        <div class="sum"><span class="label">Overall</span><h2>${r.overall >= 80 ? "Clear and well paced" : r.overall >= 60 ? "Solid, with one thing to fix" : "Room to grow"}</h2>
+        <p>Biggest win next time: <b>${esc(weakest.name.toLowerCase())}</b>.</p>${head}</div></div>
+      <div class="metrics">${r.metrics.map(metricRow).join("")}</div>
+      ${r.leaned.length ? `<div><span class="label">Words you leaned on</span><div class="leaned" style="margin-top:8px">${r.leaned.map(([w, c]) => `<span>${esc(w)} ×${c}</span>`).join("")}</div></div>` : ""}`;
+    if (isExample) $("transcript").innerHTML = highlight(r.text);
+    if (r.align && r.script === scriptText()) renderPassage(r.align.missed);
+  }
+  const currentScript = () => (mode === "read" ? scriptText() : null);
+  const modeLabel = (r) => (r.align ? "Reading" : null);
+
+  // ---------- live dictation ----------
+  let dict = null, listening = false, liveText = "", partial = "", listenStart = 0, listenedMs = 0, tick = null, lastLive = null;
+  const renderTranscript = () => { $("transcript").innerHTML = highlight(liveText) + (partial ? `<span class="partial"> ${esc(partial)}</span>` : ""); $("transcript").scrollTop = 1e6; };
+  const elapsed = () => (listenedMs + (listenStart ? performance.now() - listenStart : 0)) / 1000;
+  function setRecUI(state) {
+    listening = state !== "idle";
+    $("recBtn").classList.toggle("live", state === "listening");
+    $("recLabel").textContent = state === "idle" ? "Start speaking" : state === "starting" ? "Starting..." : state === "finishing" ? "Finishing..." : "Stop";
+  }
+  function finishLive(reason) {
+    clearInterval(tick); tick = null;
+    if (listenStart) { listenedMs += performance.now() - listenStart; listenStart = 0; }
+    const secs = listenedMs / 1000;
+    const n = wordsOf(liveText).length;
+    if (n >= 15 && secs >= 10) {
+      lastLive = analyzeText(liveText.trim(), secs, currentScript());
+      renderLive(lastLive, false);
+      saveHistory({ mode: modeLabel(lastLive) || "Live", score: lastLive.overall, wpm: lastLive.wpm, fpm: lastLive.fpm, extra: lastLive.n + " words" });
+      $("recStatus").textContent = "Scored. Try the same prompt again and compare.";
+      $("coachOut").innerHTML = "";
+      stopAudioCapture().then((blob) => {
+        if (!blob || !blob.size) return;
+        $("liveResults").insertAdjacentHTML("beforeend", '<div class="voice-block" id="liveVoice"></div>');
+        handleFile(blob, $("liveVoice"), "this session", true);
+      });
+      return;
+    }
+    stopAudioCapture();
+    if (reason !== "not_granted" && reason !== "unavailable" && reason !== "dismissed") {
+      $("recStatus").textContent = "Too short to score. Speak for at least 30 seconds.";
+    }
+  }
+  const REASONS = { not_granted: "Microphone access is blocked. Allow it from the lock icon in your browser's address bar, or paste a transcript below.",
+    unavailable: "Live speech isn't available in this browser. Use Chrome, Edge or Safari, or paste a transcript below.",
+    dismissed: "No problem. Press Start speaking when you're ready.", rate_limited: "Too many dictation sessions at once. Try again in a moment.",
+    upstream_error: "The microphone or speech service stopped. Try again.", hidden: "Stopped because the page was hidden.", time_limit: "Reached the 60-minute limit." };
+
+  function noDictation() {
+    $("recBtn").disabled = true;
+    $("recStatus").textContent = "Live speech needs Chrome, Edge or Safari. Paste a transcript below instead.";
+    $("pasteBox").open = true;
+  }
+
+  $("recBtn").addEventListener("click", () => {
+    if (!dict) return;
+    if (listening) { dict.stop().catch(() => {}); return; }
+    liveText = ""; partial = ""; listenedMs = 0; listenStart = 0;
+    $("transcript").innerHTML = ""; $("timer").textContent = "0:00"; $("recStatus").textContent = "Listening...";
+    dict.start().catch((e) => { $("recStatus").textContent = REASONS[e.code] || "Couldn't start listening. Try again."; if (e.code === "unavailable" || e.code === "not_granted") $("pasteBox").open = true; });
+    startAudioCapture();
+  });
+
+  // Wraps the browser's Web Speech API in a small start/stop/onPartial/onFinal/onState interface.
+  function makeWebSpeech() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) return null;
+    let rec = null, want = false, state = "idle", lastErr = null, stopResolve = null;
+    const h = { partial: [], final: [], state: [] };
+    const emit = (k, e) => h[k].forEach((f) => f(e));
+    const setState = (s, reason) => { state = s; emit("state", { state: s, reason }); };
+    const ERR = { "not-allowed": "not_granted", "service-not-allowed": "not_granted", "audio-capture": "not_granted", network: "upstream_error", "language-not-supported": "unavailable" };
+    function make() {
+      rec = new SR(); rec.continuous = true; rec.interimResults = true; rec.lang = navigator.language || "en-US";
+      rec.onstart = () => { if (state === "starting") setState("listening"); };
+      rec.onresult = (e) => {
+        let interim = "";
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const r = e.results[i];
+          if (r.isFinal) emit("final", { text: " " + r[0].transcript.trim() }); else interim += r[0].transcript;
+        }
+        emit("partial", { text: interim.trim() });
+      };
+      rec.onerror = (e) => { if (e.error === "no-speech" || e.error === "aborted") return; lastErr = e.error; want = false; };
+      // Chrome ends recognition after a silence; restart until the user presses Stop.
+      rec.onend = () => {
+        if (want) { try { rec.start(); return; } catch (_) {} }
+        const reason = lastErr ? ERR[lastErr] || "upstream_error" : "stopped";
+        lastErr = null; emit("partial", { text: "" }); setState("idle", reason);
+        if (stopResolve) { stopResolve(); stopResolve = null; }
+      };
+    }
+    return {
+      start() {
+        if (state !== "idle") return Promise.resolve();
+        want = true; lastErr = null; make(); setState("starting");
+        try { rec.start(); } catch (e) { want = false; setState("idle", "upstream_error"); return Promise.reject({ code: "upstream_error" }); }
+        return Promise.resolve();
+      },
+      stop() {
+        if (state === "idle") return Promise.resolve();
+        want = false; setState("finishing");
+        return new Promise((r) => { stopResolve = r; rec.stop(); });
+      },
+      onPartial: (f) => h.partial.push(f), onFinal: (f) => h.final.push(f), onState: (f) => h.state.push(f),
+    };
+  }
+
+  // Records the microphone alongside speech recognition so the voice (pitch, pauses, volume) can be scored too.
+  let mr = null, chunks = [], recBlob = null, audioDone = null;
+  async function startAudioCapture() {
+    chunks = []; recBlob = null; mr = null;
+    if (!navigator.mediaDevices || !window.MediaRecorder) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+      mr = new MediaRecorder(stream);
+      mr.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+      mr.onstop = () => { recBlob = new Blob(chunks, { type: mr.mimeType }); stream.getTracks().forEach((t) => t.stop()); if (audioDone) { audioDone(recBlob); audioDone = null; } };
+      mr.start();
+    } catch (e) { mr = null; }
+  }
+  function stopAudioCapture() {
+    return new Promise((res) => { if (!mr || mr.state === "inactive") return res(recBlob); audioDone = res; mr.stop(); });
+  }
+
+  {
+    const d = makeWebSpeech();
+    {
+      dict = d;
+      if (!d) noDictation(); else {
+      d.onPartial(({ text }) => { partial = text; renderTranscript(); });
+      d.onFinal(({ text }) => { liveText += liveText ? text : text.replace(/^\s+/, ""); partial = ""; renderTranscript(); });
+      d.onState(({ state, reason }) => {
+        setRecUI(state);
+        if (state === "listening") {
+          listenStart = performance.now();
+          tick = setInterval(() => { $("timer").textContent = fmtTime(elapsed()); }, 250);
+        } else if (state === "finishing") {
+          if (listenStart) { listenedMs += performance.now() - listenStart; listenStart = 0; }
+          clearInterval(tick); tick = null;
+        } else if (state === "idle") {
+          if (reason && REASONS[reason] && reason !== "stopped" && reason !== "viewer_stopped") $("recStatus").textContent = REASONS[reason];
+          finishLive(reason);
+        }
+      });
+      }
+    }
+  }
+
+  $("pasteGo").onclick = () => {
+    const t = $("pasteText").value.trim(), secs = Number($("pasteSecs").value);
+    if (wordsOf(t).length < 15) { $("recStatus").textContent = "Paste at least a few sentences to score."; return; }
+    if (!(secs >= 5)) { $("recStatus").textContent = "Enter how many seconds you spoke."; return; }
+    liveText = t;
+    lastLive = analyzeText(t, secs, currentScript());
+    $("transcript").innerHTML = highlight(t);
+    $("timer").textContent = fmtTime(secs);
+    renderLive(lastLive, false);
+    saveHistory({ mode: modeLabel(lastLive) || "Pasted", score: lastLive.overall, wpm: lastLive.wpm, fpm: lastLive.fpm, extra: lastLive.n + " words" });
+    $("recStatus").textContent = "Scored from your pasted transcript.";
+    $("coachOut").innerHTML = "";
+  };
+
+  // ---------- coaching prompt to paste into any AI chat ----------
+  function mdLite(s) {
+    const lines = esc(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").split("\n");
+    let out = "", inList = false;
+    lines.forEach((l) => {
+      const li = l.match(/^\s*[-*]\s+(.*)/);
+      if (li) { if (!inList) { out += "<ul>"; inList = true; } out += `<li>${li[1]}</li>`; return; }
+      if (inList) { out += "</ul>"; inList = false; }
+      const h = l.match(/^#{1,4}\s+(.*)/);
+      if (h) out += `<h4>${h[1]}</h4>`; else if (l.trim()) out += `<p>${l}</p>`;
+    });
+    return out + (inList ? "</ul>" : "");
+  }
+  $("coachBtn").onclick = async () => {
+    const r = lastLive;
+    if (!r) { $("coachOut").innerHTML = "<p>Record or paste your own session first, then ask for coaching.</p>"; return; }
+    const stats = `Pace: ${r.wpm} words per minute (target 130-160). Filler words: ${r.fpm.toFixed(1)} per minute. Average sentence length: ${r.avgSent ? Math.round(r.avgSent) + " words" : "unknown"}. Duration: ${Math.round(r.seconds)} seconds.`;
+    const input = r.align
+      ? `You are a warm but direct speaking coach. Someone read this passage aloud (/ marks a planned pause, *word* marks stress):\n"""${r.script}"""\n\nSpeech-to-text heard:\n"""${r.text}"""\n\nMeasured stats: ${stats} Reading accuracy: ${r.accuracy}%. Words skipped or not heard clearly: ${[...new Set(r.align.missedWords)].join(", ") || "none"}.\n\nReply in plain markdown, under 220 words, with exactly these sections:\n## What worked\n- 2 short bullets\n## Fix next\n- 3 bullets on pace, clarity of specific words they dropped, and where to pause or stress\n## Try this line again\nPick one sentence from the passage they should re-read, and say exactly how to deliver it.\n## Drill for tomorrow\nOne specific 60-second practice drill.`
+      : `You are a warm but direct speaking coach. The text below is a speech-to-text transcript of someone answering this prompt out loud: "${$("promptText").textContent}". Punctuation is approximate and sounds like "um" may be missing.\n\nMeasured stats: ${stats}\n\nTranscript:\n"""${r.text}"""\n\nReply in plain markdown, under 250 words, with exactly these sections:\n## What worked\n- 2 short bullets\n## Fix next\n- 3 bullets; each quotes a short phrase they actually said and shows a better way to say it\n## Stronger opening\nOne rewritten opening of 1-2 sentences they could say instead.\n## Drill for tomorrow\nOne specific 60-second practice drill.`;
+    try {
+      await navigator.clipboard.writeText(input);
+      $("coachOut").innerHTML = "<p><b>Copied.</b> Paste it into <a href=\"https://claude.ai/new\" target=\"_blank\" rel=\"noopener\">Claude</a> or any AI chat.</p>";
+    } catch (e) {
+      $("coachOut").innerHTML = "<p class='note'>Your browser blocked copying. Select the text below and copy it yourself.</p><textarea readonly id=\"coachText\"></textarea>";
+      $("coachText").value = input; $("coachText").select();
+    }
+  };
+
+  // ---------- recording analysis ----------
+  const charts = [];
+  const drop = $("drop");
+  ["dragenter", "dragover"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave", "drop"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
+  drop.addEventListener("drop", (e) => { const f = e.dataTransfer.files[0]; if (f) handleFile(f); });
+  $("fileIn").addEventListener("change", (e) => { const f = e.target.files[0]; if (f) handleFile(f); e.target.value = ""; });
+
+  async function decodeMono(file) {
+    const buf = await file.arrayBuffer();
+    let lastErr;
+    for (const rate of [8000, 16000, 22050, 44100]) {
+      try {
+        const ctx = new OfflineAudioContext(1, 1, rate);
+        const ab = await ctx.decodeAudioData(buf.slice(0));
+        const len = ab.length, ch = ab.numberOfChannels, x = new Float32Array(len);
+        for (let c = 0; c < ch; c++) { const d = ab.getChannelData(c); for (let i = 0; i < len; i++) x[i] += d[i] / ch; }
+        const f = Math.max(1, Math.round(ab.sampleRate / 8000));
+        if (f === 1) return { x, sr: ab.sampleRate };
+        const y = new Float32Array(Math.floor(len / f));
+        for (let i = 0; i < y.length; i++) { let s = 0; for (let k = 0; k < f; k++) s += x[i * f + k]; y[i] = s / f; }
+        return { x: y, sr: ab.sampleRate / f };
+      } catch (e) { lastErr = e; }
+    }
+    throw lastErr;
+  }
+
+  function pct(arr, p) { if (!arr.length) return 0; const a = Float64Array.from(arr).sort(); return a[clamp(Math.floor(p * (a.length - 1)), 0, a.length - 1)]; }
+  const mean = (a) => a.reduce((s, v) => s + v, 0) / (a.length || 1);
+  const std = (a) => { const m = mean(a); return Math.sqrt(mean(a.map((v) => (v - m) ** 2))); };
+
+  function analyzeAudio({ x, sr }) {
+    const hop = Math.round(sr * 0.01), win = Math.round(sr * 0.04);
+    const nF = Math.max(0, Math.floor((x.length - win) / hop));
+    const db = new Float32Array(nF);
+    for (let i = 0; i < nF; i++) { let s = 0; const o = i * hop; for (let j = 0; j < win; j++) s += x[o + j] * x[o + j]; db[i] = 10 * Math.log10(s / win + 1e-12); }
+    const floor = pct(db, 0.1), peak = pct(db, 0.97);
+    const thr = Math.max(floor + 9, peak - 32);
+    // speech mask: fill gaps < 150 ms, drop blips < 80 ms
+    const mask = new Uint8Array(nF); for (let i = 0; i < nF; i++) mask[i] = db[i] > thr ? 1 : 0;
+    const runs = (val, maxLen, set) => { let i = 0; while (i < nF) { if (mask[i] === val) { let j = i; while (j < nF && mask[j] === val) j++; if (j - i < maxLen && i > 0 && j < nF) for (let k = i; k < j; k++) mask[k] = set; i = j; } else i++; } };
+    runs(0, 15, 1); runs(1, 8, 0);
+    let first = mask.indexOf(1), last = mask.lastIndexOf(1);
+    if (first < 0 || last - first < 300) throw new Error("short");
+
+    // pitch (normalized autocorrelation) on speech frames
+    const minL = Math.floor(sr / 400), maxL = Math.ceil(sr / 75);
+    const f0 = new Float32Array(nF);
+    for (let i = first; i <= last; i++) {
+      if (!mask[i]) continue;
+      const o = i * hop; if (o + win + maxL >= x.length) break;
+      let m = 0; for (let j = 0; j < win; j++) m += x[o + j]; m /= win;
+      let e0 = 0; for (let j = 0; j < win; j++) { const v = x[o + j] - m; e0 += v * v; }
+      let best = 0, bestL = 0;
+      for (let L = minL; L <= maxL; L++) {
+        let r = 0, e1 = 0;
+        for (let j = 0; j < win; j++) { const a = x[o + j] - m, b = x[o + j + L] - m; r += a * b; e1 += b * b; }
+        const c = r / Math.sqrt(e0 * e1 + 1e-12);
+        if (c > best) { best = c; bestL = L; }
+      }
+      if (best > 0.6) f0[i] = sr / bestL;
+    }
+    // median-smooth pitch and drop octave jumps
+    const voicedIdx = []; for (let i = 0; i < nF; i++) if (f0[i]) voicedIdx.push(i);
+    const raw = voicedIdx.map((i) => f0[i]);
+    const sm = raw.map((_, k) => { const w = raw.slice(Math.max(0, k - 2), k + 3).sort((a, b) => a - b); return w[w.length >> 1]; });
+    const med = pct(sm, 0.5);
+    const semis = [];
+    voicedIdx.forEach((i, k) => { const st = 12 * Math.log2(sm[k] / med); if (Math.abs(st) < 12) { f0[i] = sm[k]; semis.push(st); } else f0[i] = 0; });
+    const pitchRange = semis.length > 50 ? pct(semis, 0.9) - pct(semis, 0.1) : null;
+
+    // pauses and segments
+    const pauses = [], segs = [];
+    let i = first, segStart = first;
+    while (i <= last) {
+      if (!mask[i]) { let j = i; while (j <= last && !mask[j]) j++; if (j - i >= 30) { pauses.push([i, j]); segs.push([segStart, i]); segStart = j; } i = j; } else i++;
+    }
+    segs.push([segStart, last + 1]);
+    const spanSec = (last - first + 1) / 100, mins = spanSec / 60;
+    const pausesPm = pauses.length / mins;
+    const longPauses = pauses.filter(([a, b]) => b - a >= 200).length;
+    const speechSec = segs.reduce((s, [a, b]) => { let c = 0; for (let k = a; k < b; k++) c += mask[k]; return s + c; }, 0) / 100;
+    const segDb = [], drops = [];
+    segs.forEach(([a, b]) => {
+      const vals = []; for (let k = a; k < b; k++) if (mask[k]) vals.push(db[k]);
+      if (vals.length >= 50) segDb.push(mean(vals));
+      if (vals.length >= 100) { const cut = Math.floor(vals.length * 0.75); drops.push(mean(vals.slice(0, cut)) - mean(vals.slice(cut))); }
+    });
+    const volStd = segDb.length >= 3 ? std(segDb) : null;
+    const trail = drops.length >= 2 ? mean(drops) : null;
+
+    // syllable nuclei -> estimated pace
+    const smDb = new Float32Array(nF); for (let k = 1; k < nF - 1; k++) smDb[k] = (db[k - 1] + db[k] + db[k + 1]) / 3;
+    const voicedNear = (k) => { for (let d = -3; d <= 3; d++) if (f0[k + d]) return true; return false; };
+    const peaks = [];
+    for (let k = first + 4; k <= last - 4; k++) {
+      if (!mask[k] || !voicedNear(k)) continue;
+      let isMax = true; for (let d = -4; d <= 4; d++) if (smDb[k + d] > smDb[k]) { isMax = false; break; }
+      if (!isMax) continue;
+      const p = peaks[peaks.length - 1];
+      if (p != null) {
+        if (k - p < 8) { if (smDb[k] > smDb[p]) peaks[peaks.length - 1] = k; continue; }
+        let mn = Infinity; for (let q = p; q <= k; q++) mn = Math.min(mn, smDb[q]);
+        if (Math.min(smDb[p], smDb[k]) - mn < 2) { if (smDb[k] > smDb[p]) peaks[peaks.length - 1] = k; continue; }
+      }
+      peaks.push(k);
+    }
+    const wpm = Math.round(peaks.length / 1.45 / mins);
+
+    // scores
+    const paceS = bandScore(wpm, 130, 160, 2);
+    const pitchS = pitchRange == null ? null : bandScore(pitchRange, 5, 14, 20);
+    const pauseS = Math.round((bandScore(pausesPm, 6, 20, 6) + clamp(100 - Math.max(0, longPauses / mins - 1) * 30, 0, 100)) / 2);
+    const volS = volStd == null ? null : bandScore(volStd, 0, 4, 15);
+    const trailS = trail == null ? null : bandScore(trail, -10, 3, 15);
+    const parts = [[paceS, 25], [pitchS, 25], [pauseS, 20], [volS, 15], [trailS, 15]].filter(([s]) => s != null);
+    const overall = Math.round(parts.reduce((a, [s, w]) => a + s * w, 0) / parts.reduce((a, [, w]) => a + w, 0));
+    const r1 = (v) => Math.round(v * 10) / 10;
+
+    const metrics = [
+      { name: "Pace (estimated)", value: wpm, display: String(wpm), unit: "wpm", min: 60, max: 240, lo: 130, hi: 160, score: paceS,
+        chip: wpm > 160 ? (paceS >= 50 ? ["warn", "A bit fast"] : ["bad", "Too fast"]) : wpm < 130 ? (paceS >= 50 ? ["warn", "A bit slow"] : ["bad", "Too slow"]) : null,
+        tip: "Counted from syllables in the audio, so treat it as within about 15%. " + (wpm > 160 ? "Slow down and let key points land." : wpm < 130 ? "You can pick up the pace a little." : "A comfortable pace.") },
+      { name: "Pitch range", value: pitchRange == null ? null : r1(pitchRange), display: pitchRange == null ? "n/a" : r1(pitchRange).toFixed(1), unit: "semitones", min: 0, max: 20, lo: 5, hi: 14, score: pitchS ?? 0,
+        chip: pitchRange == null ? ["warn", "Unclear audio"] : pitchRange < 5 ? (pitchS >= 50 ? ["warn", "A bit flat"] : ["bad", "Monotone"]) : null,
+        tip: pitchRange == null ? "Couldn't track your pitch. Record closer to the mic in a quiet room." :
+             pitchRange < 5 ? `Your voice sits around ${Math.round(med)} Hz with little movement. Lift your pitch on the word that matters most in each sentence, and drop it at the end of a statement.` :
+             `Your voice moves around ${Math.round(med)} Hz with healthy variation, which keeps listeners engaged.` },
+      { name: "Pauses", value: Math.round(pausesPm), display: String(Math.round(pausesPm)), unit: "per min", min: 0, max: 40, lo: 6, hi: 20, score: pauseS,
+        tip: `${pauses.length} pauses of 0.3 s or more${longPauses ? `, ${longPauses} of them over 2 s` : ""}. ` +
+             (pausesPm < 6 ? "You rarely stop. Pause after each main point; it sounds confident and gives people time to think." :
+              longPauses / mins > 1 ? "Some long gaps. Plan your next point while you finish the current one." : "Good use of pauses.") },
+      { name: "Volume consistency", value: volStd == null ? null : r1(volStd), display: volStd == null ? "n/a" : r1(volStd).toFixed(1), unit: "dB spread", min: 0, max: 12, lo: 0, hi: 4, score: volS ?? 0,
+        chip: volStd == null ? ["warn", "Too short"] : null,
+        tip: volStd == null ? "Need a few more phrases to measure this." : volStd > 4 ? "Your volume swings between phrases. Keep your mouth the same distance from the mic and support each phrase with breath." : "Your energy stays even from phrase to phrase." },
+      { name: "Trailing off", value: trail == null ? null : r1(trail), display: trail == null ? "n/a" : r1(trail).toFixed(1), unit: "dB drop", min: -4, max: 12, lo: -4, hi: 3, score: trailS ?? 0,
+        chip: trail == null ? ["warn", "Too short"] : null,
+        tip: trail == null ? "Need longer phrases to measure this." : trail > 3 ? "You get quieter at the end of phrases. Keep your volume up through the last word, then breathe." : "You finish your phrases with steady volume." },
+    ];
+    return { kind: "file", metrics, overall, wpm, pitchRange, med, pausesPm, longPauses, spanSec, speechSec, db, f0, mask, pauses, first, last, floor, peak, thr, nF };
+  }
+
+  async function handleFile(file, box = $("fileResults"), name = file.name, fromLive = false) {
+    box.hidden = false;
+    box.innerHTML = `<p>Analyzing <b>${esc(name)}</b>...</p>`;
+    await new Promise((r) => setTimeout(r, 30));
+    let audio;
+    try { audio = await decodeMono(file); }
+    catch (e) { box.innerHTML = `<p>Couldn't read <b>${esc(name)}</b>. Save it as M4A, MP3 or WAV and try again.</p>`; return; }
+    let r;
+    try { r = analyzeAudio(audio); }
+    catch (e) { box.innerHTML = `<p>Not enough speech found in <b>${esc(name)}</b>. Record at least 10 seconds of talking, close to the mic.</p>`; return; }
+    const weakest = r.metrics.filter((m) => m.value != null).sort((a, b) => a.score - b.score)[0];
+    box.innerHTML = `
+      <div class="score-head">${ring(r.overall)}
+        <div class="sum"><span class="label">${fromLive ? "Your voice" : "Voice score"}</span><h2>${r.overall >= 80 ? "Confident, engaging delivery" : r.overall >= 60 ? "Good delivery, one thing to fix" : "Room to grow"}</h2>
+        <p>Biggest win next time: <b>${esc(weakest.name.toLowerCase())}</b>.</p>
+        <p class="note">${esc(name)} · ${fmtTime(r.spanSec)} of talking · you were speaking ${Math.round((r.speechSec / r.spanSec) * 100)}% of the time</p></div></div>
+      <div class="chart-wrap"><span class="label">Your recording</span><canvas></canvas>
+        <div class="legend"><span><i style="background:var(--accent);opacity:.55"></i>Loudness</span><span><i style="background:var(--ink)"></i>Pitch</span><span><i style="background:var(--line)"></i>Pause</span><span><i style="background:var(--warn);opacity:.5"></i>Long pause (2 s+)</span></div></div>
+      <div class="metrics">${r.metrics.map(metricRow).join("")}</div>`;
+    const cv = box.querySelector("canvas");
+    charts.push([r, cv]);
+    drawChart(r, cv);
+    if (fromLive) {
+      const h = loadHistory();
+      if (h[0]) { h[0].pitch = r.pitchRange; try { localStorage.setItem(KEY, JSON.stringify(h)); } catch (e) {} renderHistory(h); }
+    } else saveHistory({ mode: "Recording", score: r.overall, wpm: r.wpm, pitch: r.pitchRange, extra: fmtTime(r.spanSec) });
+  }
+
+  function drawChart(r, cv) {
+    if (!cv || !cv.isConnected || !cv.clientWidth) return;
+    const css = getComputedStyle(document.documentElement);
+    const col = (n) => css.getPropertyValue(n).trim();
+    const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+    cv.width = W * dpr; cv.height = H * dpr;
+    const g = cv.getContext("2d"); g.scale(dpr, dpr); g.clearRect(0, 0, W, H);
+    const a = Math.max(0, r.first - 30), b = Math.min(r.nF, r.last + 30), n = b - a;
+    const X = (i) => ((i - a) / n) * W;
+    const base = H - 18, lowH = H * 0.5;
+    // pauses
+    r.pauses.forEach(([s, e]) => { g.fillStyle = e - s >= 200 ? col("--warn") : col("--line"); g.globalAlpha = e - s >= 200 ? 0.35 : 0.8; g.fillRect(X(s), 0, X(e) - X(s), base); });
+    g.globalAlpha = 1;
+    // loudness envelope
+    g.beginPath(); g.moveTo(0, base);
+    const step = Math.max(1, Math.floor(n / W));
+    for (let i = a; i < b; i += step) { const v = clamp((r.db[i] - r.floor) / (r.peak - r.floor), 0, 1); g.lineTo(X(i), base - v * lowH); }
+    g.lineTo(W, base); g.closePath(); g.fillStyle = col("--accent"); g.globalAlpha = 0.55; g.fill(); g.globalAlpha = 1;
+    // pitch dots
+    g.fillStyle = col("--ink");
+    const topH = H * 0.42;
+    for (let i = a; i < b; i++) if (r.f0[i]) { const st = clamp(12 * Math.log2(r.f0[i] / r.med), -12, 12); g.fillRect(X(i), 6 + (1 - (st + 12) / 24) * topH, 1.6, 1.6); }
+    // time axis
+    g.fillStyle = col("--muted"); g.font = "11px " + col("--mono");
+    const secs = n / 100, tickEvery = secs > 120 ? 30 : secs > 40 ? 10 : 5;
+    for (let t = 0; t <= secs; t += tickEvery) { const px = (t / secs) * W; g.fillText(fmtTime(t + a / 100), Math.min(px + 2, W - 30), H - 4); }
+  }
+  let rz; window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => charts.forEach(([r, cv]) => drawChart(r, cv)), 150); });
+
+  // ---------- history (this browser only) ----------
+  const KEY = "speaking-coach.history";
+  function loadHistory() { try { return JSON.parse(localStorage.getItem(KEY) || "[]"); } catch (e) { return []; } }
+  function saveHistory(entry) {
+    const h = loadHistory(); h.unshift({ t: Date.now(), ...entry });
+    try { localStorage.setItem(KEY, JSON.stringify(h.slice(0, 50))); } catch (e) {}
+    renderHistory(h);
+  }
+  function renderHistory(h = loadHistory()) {
+    $("clearHist").hidden = !h.length; $("clearHist").textContent = "Clear history"; confirmClear = false;
+    if (!h.length) { $("history").innerHTML = `<p class="note">Your scored sessions will appear here, newest first, so you can compare runs. They're kept in this browser only.</p>`; return; }
+    const best = Math.max(...h.map((e) => e.score));
+    $("history").innerHTML = `<div class="table-wrap"><table><thead><tr><th>When</th><th>Type</th><th>Score</th><th>Pace</th><th>Fillers / min</th><th>Pitch range</th><th>Length</th></tr></thead><tbody>` +
+      h.slice(0, 15).map((e) => `<tr><td>${new Date(e.t).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</td><td>${esc(e.mode)}</td>
+        <td class="num">${e.score}${e.score === best ? " ★" : ""}</td><td class="num">${e.wpm} wpm</td>
+        <td class="num">${e.fpm != null ? e.fpm.toFixed(1) : "–"}</td><td class="num">${e.pitch != null ? e.pitch.toFixed(1) + " st" : "–"}</td><td class="num">${esc(e.extra || "")}</td></tr>`).join("") +
+      `</tbody></table></div>`;
+  }
+  let confirmClear = false;
+  $("clearHist").onclick = () => {
+    if (!confirmClear) { confirmClear = true; $("clearHist").textContent = "Click again to clear"; return; }
+    try { localStorage.removeItem(KEY); } catch (e) {}
+    renderHistory([]);
+  };
+
+  // ---------- initial example state ----------
+  const EXAMPLE = "So I work on the marketing team, and basically my job is to help loan officers, um, find new clients. We write emails and social posts that they can share with their network. It matters because, you know, most people only talk to one lender before they buy a home, and they actually end up paying more than they need to. So if we can, like, put better information in front of them earlier, they make a better decision. And for the loan officer it means they get more referrals without having to cold call. I think the part I enjoy most is seeing which emails actually work, and then doing more of that.";
+  renderPassage();
+  setMode("read");
+  renderLive(analyzeText(EXAMPLE, 44), true);
+  renderHistory();
+})();
+</script>
+</body>
+</html>
