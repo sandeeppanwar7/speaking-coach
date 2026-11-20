@@ -140,6 +140,19 @@ th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--lin
 th { font: 700 12px var(--body); letter-spacing: .06em; text-transform: uppercase; color: var(--muted) }
 td.num { font-family: var(--mono); font-variant-numeric: tabular-nums }
 .hist-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap }
+/* Progress table turns into one card per session on phones */
+@media (max-width: 640px) {
+  .table-wrap { overflow: visible }
+  .hist-table thead { display: none }
+  .hist-table, .hist-table tbody { display: grid; gap: 12px }
+  .hist-table tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; padding: 14px 16px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px }
+  .hist-table td { display: grid; gap: 2px; padding: 0; border: 0; white-space: normal; min-width: 0 }
+  .hist-table td::before { content: attr(data-label); font: 700 11px var(--body); letter-spacing: .06em; text-transform: uppercase; color: var(--muted) }
+  .hist-table td.when, .hist-table td.type { grid-row: 1; font-weight: 700 }
+  .hist-table td.type { justify-self: end; text-align: right }
+  .hist-table td.when::before, .hist-table td.type::before { content: none }
+  .hist-table td.score { grid-column: 1 / -1; font-size: 26px; font-weight: 700; padding-bottom: 10px; border-bottom: 1px solid var(--line) }
+}
 </style>
 </head>
 <body>
@@ -837,10 +850,10 @@ td.num { font-family: var(--mono); font-variant-numeric: tabular-nums }
     $("clearHist").hidden = !h.length; $("clearHist").textContent = "Clear history"; confirmClear = false;
     if (!h.length) { $("history").innerHTML = `<p class="note">Your scored sessions will appear here, newest first, so you can compare runs. They're kept in this browser only.</p>`; return; }
     const best = Math.max(...h.map((e) => e.score));
-    $("history").innerHTML = `<div class="table-wrap"><table><thead><tr><th>When</th><th>Type</th><th>Score</th><th>Pace</th><th>Fillers / min</th><th>Pitch range</th><th>Length</th></tr></thead><tbody>` +
-      h.slice(0, 15).map((e) => `<tr><td>${new Date(e.t).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</td><td>${esc(e.mode)}</td>
-        <td class="num">${e.score}${e.score === best ? " ★" : ""}</td><td class="num">${e.wpm} wpm</td>
-        <td class="num">${e.fpm != null ? e.fpm.toFixed(1) : "–"}</td><td class="num">${e.pitch != null ? e.pitch.toFixed(1) + " st" : "–"}</td><td class="num">${esc(e.extra || "")}</td></tr>`).join("") +
+    $("history").innerHTML = `<div class="table-wrap"><table class="hist-table"><thead><tr><th>When</th><th>Type</th><th>Score</th><th>Pace</th><th>Fillers / min</th><th>Pitch range</th><th>Length</th></tr></thead><tbody>` +
+      h.slice(0, 15).map((e) => `<tr><td class="when" data-label="When">${new Date(e.t).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</td><td class="type" data-label="Type">${esc(e.mode)}</td>
+        <td class="num score" data-label="Score">${e.score}${e.score === best ? " ★" : ""}</td><td class="num" data-label="Pace">${e.wpm} wpm</td>
+        <td class="num" data-label="Fillers / min">${e.fpm != null ? e.fpm.toFixed(1) : "–"}</td><td class="num" data-label="Pitch range">${e.pitch != null ? e.pitch.toFixed(1) + " st" : "–"}</td><td class="num" data-label="Length">${esc(e.extra || "")}</td></tr>`).join("") +
       `</tbody></table></div>`;
   }
   let confirmClear = false;
