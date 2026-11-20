@@ -153,6 +153,47 @@ td.num { font-family: var(--mono); font-variant-numeric: tabular-nums }
   .hist-table td.when::before, .hist-table td.type::before { content: none }
   .hist-table td.score { grid-column: 1 / -1; font-size: 26px; font-weight: 700; padding-bottom: 10px; border-bottom: 1px solid var(--line) }
 }
+/* Daily drills */
+.streak { display: grid; justify-items: center; padding: 8px 16px; border: 1px solid var(--line); border-radius: 12px; font-size: 13px; color: var(--muted) }
+.streak .mono { font-size: 28px; font-weight: 700; color: var(--accent); line-height: 1.1 }
+.routine { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px }
+.routine button { width: 100%; display: flex; align-items: center; gap: 10px; text-align: left; font: 400 15px var(--body); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; cursor: pointer }
+.routine .tick { flex: none; width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--line); display: grid; place-items: center; font: 700 12px var(--body); color: var(--accent-ink) }
+.routine .is-done .tick { background: var(--accent); border-color: var(--accent) }
+.routine .is-done span:last-child { color: var(--muted); text-decoration: line-through }
+.drill-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px }
+.mins { font: 500 13px var(--mono); color: var(--muted); white-space: nowrap }
+.drill p { max-width: 65ch }
+.drill-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap }
+.done-btn { justify-self: start }
+.done-btn[aria-pressed="true"] { background: var(--band); border-color: var(--accent); color: var(--ink) }
+select { font: 15px var(--body); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px; max-width: 100% }
+.breath { display: flex; align-items: center; gap: 24px; flex-wrap: wrap }
+.breath-ring { position: relative; width: 150px; height: 150px; flex: none; display: grid; place-items: center; border-radius: 50%; border: 2px dashed var(--line) }
+.breath-dot { position: absolute; inset: 10px; border-radius: 50%; background: var(--band); transform: scale(.45); transition: transform 4s linear }
+.breath-txt { position: relative; display: grid; justify-items: center; gap: 2px }
+.breath-txt .mono { font-size: 26px; font-weight: 700 }
+@media (prefers-reduced-motion: reduce) { .breath-dot { transition: none } }
+.twister { margin: 0; font: 600 clamp(19px, 3.6vw, 24px)/1.4 var(--display); padding: 18px 20px; border-left: 4px solid var(--accent); background: var(--bg); border-radius: 0 10px 10px 0 }
+.pace-text .pw { transition: color .15s }
+.pace-text.running .pw { color: var(--muted) }
+.pace-text.running .pw.read { color: var(--ink) }
+.pace-text .pw.now { background: var(--band); color: var(--ink); border-radius: 4px; box-shadow: 0 0 0 3px var(--band) }
+.stress-list { list-style: none; margin: 0; padding: 0; display: grid }
+.stress-list li { display: flex; justify-content: space-between; gap: 6px 16px; flex-wrap: wrap; padding: 9px 0; border-top: 1px solid var(--line); font-size: 17px }
+.stress-list li:first-child { border-top: 0 }
+.stress-list b { color: var(--accent); text-decoration: underline; text-underline-offset: 4px }
+.stress-list em { color: var(--muted); font-size: 14px }
+.topic { font: 600 19px/1.35 var(--display) }
+.minute-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap }
+.tally { display: flex; align-items: center; justify-content: center; gap: 14px; width: 100%; padding: 18px; border-radius: 14px; border: 2px solid var(--accent); background: var(--surface); color: var(--ink); font: 700 16px var(--body); cursor: pointer; touch-action: manipulation }
+.tally .mono { font-size: 34px; color: var(--accent) }
+.tally:disabled { border-color: var(--line); cursor: default; opacity: .6 }
+.tally:not(:disabled):active { background: var(--band) }
+.steps { margin: 0; padding-left: 20px; display: grid; gap: 8px; max-width: 70ch }
+.frames { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px }
+.frames > div { display: grid; gap: 6px; align-content: start; padding: 14px 16px; background: var(--bg); border-radius: 10px; min-width: 0 }
+.frames ol { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 15px }
 </style>
 </head>
 <body>
@@ -166,6 +207,7 @@ td.num { font-family: var(--mono); font-variant-numeric: tabular-nums }
   <nav class="tabs" role="tablist">
     <button class="tab" role="tab" id="tab-live" aria-selected="true" aria-controls="panel-live">Speak live</button>
     <button class="tab" role="tab" id="tab-file" aria-selected="false" aria-controls="panel-file">Analyze a recording</button>
+    <button class="tab" role="tab" id="tab-drills" aria-selected="false" aria-controls="panel-drills">Daily drills</button>
   </nav>
 
   <!-- LIVE -->
@@ -239,6 +281,111 @@ td.num { font-family: var(--mono); font-variant-numeric: tabular-nums }
     <div class="card" id="fileResults" hidden></div>
   </section>
 
+  <!-- DRILLS -->
+  <section class="panel" id="panel-drills" role="tabpanel" aria-labelledby="tab-drills" hidden>
+    <div class="card">
+      <div class="hist-head">
+        <div><span class="label">Today's routine · about 10 minutes</span><h2 id="drillSummary">0 of 6 done</h2></div>
+        <div class="streak"><span class="mono" id="streakNum">0</span><span>day streak</span></div>
+      </div>
+      <ol class="routine" id="routine"></ol>
+      <p class="note">A day counts toward your streak once you finish 3 drills. Small daily practice beats one long session a week.</p>
+    </div>
+
+    <article class="card drill" id="d-breathe">
+      <div class="drill-head"><h3>1. Breathe low and slow</h3><span class="mins">2 min</span></div>
+      <p>Nerves make you breathe high in your chest, which makes your voice thin and fast. Box breathing calms you down and gets your breath into your belly, where your voice gets its power.</p>
+      <div class="breath">
+        <div class="breath-ring"><div class="breath-dot" id="breathDot"></div><div class="breath-txt"><b id="breathPhase">Ready</b><span class="mono" id="breathCount">4</span></div></div>
+        <div class="drill-actions"><button class="btn primary" id="breathBtn">Start breathing</button><span class="note" id="breathLeft">8 rounds of breathe in 4, hold 4, out 4, hold 4.</span></div>
+      </div>
+      <button class="btn done-btn" data-drill="breathe">Mark done</button>
+    </article>
+
+    <article class="card drill" id="d-twister">
+      <div class="drill-head"><h3>2. Warm up your mouth</h3><span class="mins">2 min</span></div>
+      <p>Say each line 3 times slowly, exaggerating every consonant, then 3 times fast. If you stumble, slow down until you don't.</p>
+      <blockquote class="twister" id="twister"></blockquote>
+      <div class="drill-actions"><button class="btn" id="twisterNext">Next tongue twister</button><span class="note mono" id="twisterPos"></span></div>
+      <button class="btn done-btn" data-drill="twister">Mark done</button>
+    </article>
+
+    <article class="card drill" id="d-pace">
+      <div class="drill-head"><h3>3. Pace trainer</h3><span class="mins">2 min</span></div>
+      <p>Read along as the highlight moves. It teaches your body what a calm pace feels like. Start at 130 words per minute; once that feels easy, try 150.</p>
+      <div class="drill-actions">
+        <label for="paceWpm" class="note">Speed</label>
+        <select id="paceWpm"><option value="120">120 wpm · slow and deliberate</option><option value="130" selected>130 wpm · calm presenter</option><option value="150">150 wpm · natural conversation</option><option value="170">170 wpm · too fast (feel the difference)</option></select>
+        <button class="btn primary" id="paceBtn">Start</button><button class="btn" id="paceNext">Next passage</button>
+      </div>
+      <div class="passage pace-text" id="paceText"></div>
+      <button class="btn done-btn" data-drill="pace">Mark done</button>
+    </article>
+
+    <article class="card drill" id="d-stress">
+      <div class="drill-head"><h3>4. Stress changes meaning</h3><span class="mins">1 min</span></div>
+      <p>Say the same sentence seven times, leaning hard on the bold word each time. Notice how the meaning changes. This is how you stop sounding flat.</p>
+      <ul class="stress-list">
+        <li><span><b>I</b> never said she took the money.</span><em>Someone else said it.</em></li>
+        <li><span>I <b>never</b> said she took the money.</span><em>I deny it completely.</em></li>
+        <li><span>I never <b>said</b> she took the money.</span><em>I only hinted at it.</em></li>
+        <li><span>I never said <b>she</b> took the money.</span><em>Someone else took it.</em></li>
+        <li><span>I never said she <b>took</b> the money.</span><em>She borrowed it.</em></li>
+        <li><span>I never said she took <b>the</b> money.</span><em>Just some of it.</em></li>
+        <li><span>I never said she took the <b>money</b>.</span><em>She took something else.</em></li>
+      </ul>
+      <button class="btn done-btn" data-drill="stress">Mark done</button>
+    </article>
+
+    <article class="card drill" id="d-minute">
+      <div class="drill-head"><h3>5. One minute, no fillers</h3><span class="mins">2 min</span></div>
+      <p>Talk about the topic for 60 seconds. Every time you say um, uh, like or so, tap the counter, or have a friend tap it. When you feel a filler coming, pause silently instead.</p>
+      <p class="topic" id="minuteTopic"></p>
+      <div class="minute-row">
+        <span class="timer mono" id="minuteClock">1:00</span>
+        <button class="btn primary" id="minuteBtn">Start 60 seconds</button>
+        <button class="btn" id="minuteTopicBtn">New topic</button>
+      </div>
+      <button class="tally" id="tallyBtn" disabled><span class="mono" id="tallyNum">0</span><span>Tap for each filler</span></button>
+      <p class="note" id="minuteResult">Your best so far appears here.</p>
+      <button class="btn done-btn" data-drill="minute">Mark done</button>
+    </article>
+
+    <article class="card drill" id="d-range">
+      <div class="drill-head"><h3>6. Stretch your pitch</h3><span class="mins">1 min</span></div>
+      <p>A wider pitch range makes you sound engaged. These feel silly. Do them anyway.</p>
+      <ul class="steps">
+        <li>Count from one to ten, starting at your lowest comfortable note and going a little higher on each number. Then count back down.</li>
+        <li>Say <b>"Really?"</b> four ways: surprised, bored, angry, delighted.</li>
+        <li>Slide on <b>"wow"</b> from low to high, like a siren, then high to low.</li>
+        <li>Read one sentence from the passages, making the last word go <b>down</b>. Statements that end low sound sure; ones that rise sound like questions.</li>
+      </ul>
+      <button class="btn done-btn" data-drill="range">Mark done</button>
+    </article>
+
+    <div class="card">
+      <h2>Structures that make you sound clear</h2>
+      <p class="note">Pick one before you speak. A structure stops rambling better than any amount of practice.</p>
+      <div class="frames">
+        <div><h3>PREP</h3><p class="note">For opinions and answers</p><ol><li><b>Point.</b> "I think we should launch in March."</li><li><b>Reason.</b> "Our biggest clients plan budgets in Q1."</li><li><b>Example.</b> "Last year three of them asked us in February."</li><li><b>Point again.</b> "So March gives us the best shot."</li></ol></div>
+        <div><h3>STAR</h3><p class="note">For stories and interview answers</p><ol><li><b>Situation.</b> Where and when.</li><li><b>Task.</b> What you had to do.</li><li><b>Action.</b> What you did, using "I".</li><li><b>Result.</b> What changed, with a number if you have one.</li></ol></div>
+        <div><h3>What, so what, now what</h3><p class="note">For updates and meetings</p><ol><li><b>What.</b> "Sign-ups dropped 10% this week."</li><li><b>So what.</b> "At this rate we miss the quarter."</li><li><b>Now what.</b> "I want to test a shorter form by Friday."</li></ol></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Habits that work</h2>
+      <ul class="steps">
+        <li><b>Record yourself once a day and listen back.</b> Uncomfortable, and the fastest way to improve.</li>
+        <li><b>Pause instead of filling.</b> A one-second silence sounds confident. "Um" sounds unsure.</li>
+        <li><b>Lead with your point.</b> Say the conclusion first, then explain it.</li>
+        <li><b>End sentences on a downward note.</b> Rising at the end makes statements sound like questions.</li>
+        <li><b>Speak to the back of the room.</b> Aim your voice past the person you're talking to.</li>
+        <li><b>Read aloud for 5 minutes a day.</b> News articles, books, anything. It trains your mouth and your breath together.</li>
+      </ul>
+    </div>
+  </section>
+
   <!-- HISTORY -->
   <section class="card">
     <div class="hist-head">
@@ -259,7 +406,7 @@ td.num { font-family: var(--mono); font-variant-numeric: tabular-nums }
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
   // ---------- tabs ----------
-  const tabs = [["tab-live", "panel-live"], ["tab-file", "panel-file"]];
+  const tabs = [["tab-live", "panel-live"], ["tab-file", "panel-file"], ["tab-drills", "panel-drills"]];
   function showTab(id) {
     tabs.forEach(([t, p]) => { const on = t === id; $(t).setAttribute("aria-selected", on); $(p).hidden = !on; });
     charts.forEach(([r, cv]) => drawChart(r, cv));
@@ -862,6 +1009,128 @@ td.num { font-family: var(--mono); font-variant-numeric: tabular-nums }
     try { localStorage.removeItem(KEY); } catch (e) {}
     renderHistory([]);
   };
+
+  // ---------- daily drills (no AI) ----------
+  const DRILLS = [["breathe", "Breathe low and slow"], ["twister", "Warm up your mouth"], ["pace", "Pace trainer"], ["stress", "Stress changes meaning"], ["minute", "One minute, no fillers"], ["range", "Stretch your pitch"]];
+  const DKEY = "speaking-coach.drills";
+  const dayKey = (d = new Date()) => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  function loadDrills() { try { return JSON.parse(localStorage.getItem(DKEY) || "{}"); } catch (e) { return {}; } }
+  function saveDrills(o) { try { localStorage.setItem(DKEY, JSON.stringify(o)); } catch (e) {} }
+  function streakOf(o) {
+    const days = o.days || {}, d = new Date();
+    if ((days[dayKey(d)] || []).length < 3) d.setDate(d.getDate() - 1);
+    let n = 0;
+    while ((days[dayKey(d)] || []).length >= 3) { n++; d.setDate(d.getDate() - 1); }
+    return n;
+  }
+  function renderRoutine() {
+    const o = loadDrills(), today = (o.days || {})[dayKey()] || [];
+    $("routine").innerHTML = DRILLS.map(([id, name], i) => `<li><button data-go="${id}" class="${today.includes(id) ? "is-done" : ""}"><span class="tick">${today.includes(id) ? "✓" : ""}</span><span>${i + 1}. ${name}</span></button></li>`).join("");
+    $("drillSummary").textContent = today.length === 6 ? "All 6 done today. Nice work." : `${today.length} of 6 done`;
+    $("streakNum").textContent = streakOf(o);
+    document.querySelectorAll(".done-btn").forEach((b) => { const on = today.includes(b.dataset.drill); b.setAttribute("aria-pressed", on); b.textContent = on ? "Done ✓" : "Mark done"; });
+  }
+  function toggleDrill(id) {
+    const o = loadDrills(); o.days = o.days || {};
+    const k = dayKey(), t = o.days[k] || [];
+    o.days[k] = t.includes(id) ? t.filter((x) => x !== id) : t.concat(id);
+    saveDrills(o); renderRoutine();
+  }
+  $("routine").addEventListener("click", (e) => { const b = e.target.closest("[data-go]"); if (b) $("d-" + b.dataset.go).scrollIntoView({ behavior: "smooth", block: "start" }); });
+  document.querySelectorAll(".done-btn").forEach((b) => b.addEventListener("click", () => toggleDrill(b.dataset.drill)));
+
+  // box breathing: 4 phases of 4 seconds, 8 rounds
+  let breathTimer = null;
+  const PHASES = [["Breathe in", 1], ["Hold", 1], ["Breathe out", 0.45], ["Hold", 0.45]];
+  function stopBreath(msg) { clearInterval(breathTimer); breathTimer = null; $("breathBtn").textContent = "Start breathing"; $("breathPhase").textContent = msg || "Ready"; $("breathCount").textContent = "4"; $("breathDot").style.transform = "scale(.45)"; }
+  $("breathBtn").onclick = () => {
+    if (breathTimer) return stopBreath();
+    let sec = 0; const total = 8 * 16;
+    $("breathBtn").textContent = "Stop";
+    const tickB = () => {
+      if (sec >= total) { stopBreath("Done"); $("breathLeft").textContent = "Nice. Your voice is ready."; return; }
+      const [name, scale] = PHASES[Math.floor(sec / 4) % 4];
+      $("breathPhase").textContent = name; $("breathCount").textContent = 4 - (sec % 4);
+      if (sec % 4 === 0) $("breathDot").style.transform = `scale(${scale})`;
+      $("breathLeft").textContent = `Round ${Math.floor(sec / 16) + 1} of 8`;
+      sec++;
+    };
+    tickB(); breathTimer = setInterval(tickB, 1000);
+  };
+
+  // tongue twisters
+  const TWISTERS = [
+    "Red leather, yellow leather.",
+    "Unique New York, unique New York, you know you need unique New York.",
+    "She sells seashells by the seashore.",
+    "Peter Piper picked a peck of pickled peppers.",
+    "Truly rural, truly rural, truly rural.",
+    "Six slippery snails slid slowly seaward.",
+    "Big black bug bit a big black bear.",
+    "Toy boat, toy boat, toy boat.",
+    "The lips, the teeth, the tip of the tongue.",
+    "Good blood, bad blood, good blood, bad blood.",
+    "Which witch wished which wicked wish?",
+    "Fresh French fried fly fritters.",
+  ];
+  let twIdx = 0;
+  const showTwister = () => { $("twister").textContent = TWISTERS[twIdx]; $("twisterPos").textContent = `${twIdx + 1} / ${TWISTERS.length}`; };
+  $("twisterNext").onclick = () => { twIdx = (twIdx + 1) % TWISTERS.length; showTwister(); };
+
+  // pace trainer: highlights one word at a time at the chosen speed, with a short hold at each "/"
+  let paceIdx = 0, paceTimer = null;
+  function paceRender() {
+    $("paceText").classList.remove("running");
+    $("paceText").innerHTML = PASSAGES[paceIdx][1].split(/\s+/).map((t) => t === "/" ? '<span class="pause-mark">/</span>' : `<span class="pw">${esc(t).replace(/\*(.+?)\*/g, "<strong>$1</strong>")}</span>`).join(" ");
+  }
+  function paceStop() { clearTimeout(paceTimer); paceTimer = null; $("paceBtn").textContent = "Start"; }
+  $("paceBtn").onclick = () => {
+    if (paceTimer) { paceStop(); return; }
+    paceRender();
+    const box = $("paceText"), nodes = [...box.children], ms = 60000 / Number($("paceWpm").value);
+    box.classList.add("running"); $("paceBtn").textContent = "Stop";
+    let i = 0;
+    const step = () => {
+      box.querySelectorAll(".now").forEach((n) => { n.classList.remove("now"); n.classList.add("read"); });
+      if (i >= nodes.length) { paceStop(); box.classList.remove("running"); return; }
+      const n = nodes[i++];
+      if (n.classList.contains("pause-mark")) { paceTimer = setTimeout(step, 450); return; }
+      n.classList.add("now");
+      const r = n.getBoundingClientRect();
+      if (r.bottom > innerHeight - 40 || r.top < 40) n.scrollIntoView({ block: "center", behavior: "smooth" });
+      paceTimer = setTimeout(step, ms);
+    };
+    step();
+  };
+  $("paceNext").onclick = () => { paceStop(); paceIdx = (paceIdx + 1) % PASSAGES.length; paceRender(); };
+
+  // one minute, no fillers
+  const TOPICS = ["Your favourite place to eat, and why.", "The best advice anyone ever gave you.", "How you would spend a free Saturday.", "A skill you'd love to learn this year.", "What makes a good manager.", "A movie or show everyone should watch.", "The hardest part of your job.", "Your morning routine.", "A city you'd love to live in.", "Something you changed your mind about.", "How to make a good first impression.", "Why people should read more."];
+  let topicIdx = 0, minuteTimer = null, minuteLeft = 60, tally = 0;
+  const FKEY = "speaking-coach.fillerBest";
+  $("minuteTopic").textContent = TOPICS[0];
+  $("minuteTopicBtn").onclick = () => { topicIdx = (topicIdx + 1) % TOPICS.length; $("minuteTopic").textContent = TOPICS[topicIdx]; };
+  function bestFillers() { try { const v = localStorage.getItem(FKEY); return v == null ? null : Number(v); } catch (e) { return null; } }
+  function showBest() { const b = bestFillers(); if (b != null) $("minuteResult").textContent = `Your best: ${b} filler${b === 1 ? "" : "s"} in a minute.`; }
+  function endMinute(finished) {
+    clearInterval(minuteTimer); minuteTimer = null;
+    $("tallyBtn").disabled = true; $("minuteBtn").textContent = "Start 60 seconds"; $("minuteClock").textContent = "1:00";
+    if (!finished) return;
+    const best = bestFillers();
+    let msg = `${tally} filler${tally === 1 ? "" : "s"} this round.`;
+    if (best == null || tally < best) { try { localStorage.setItem(FKEY, tally); } catch (e) {} msg += best == null ? " That's your first score; beat it tomorrow." : ` New best, down from ${best}.`; }
+    else msg += ` Your best is ${best}.`;
+    $("minuteResult").textContent = msg;
+  }
+  $("minuteBtn").onclick = () => {
+    if (minuteTimer) return endMinute(false);
+    tally = 0; minuteLeft = 60; $("tallyNum").textContent = "0";
+    $("tallyBtn").disabled = false; $("minuteBtn").textContent = "Stop";
+    minuteTimer = setInterval(() => { minuteLeft--; $("minuteClock").textContent = fmtTime(minuteLeft); if (minuteLeft <= 0) endMinute(true); }, 1000);
+  };
+  $("tallyBtn").onclick = () => { tally++; $("tallyNum").textContent = tally; };
+
+  showTwister(); paceRender(); showBest(); renderRoutine();
 
   // ---------- initial example state ----------
   const EXAMPLE = "So I work on the marketing team, and basically my job is to help loan officers, um, find new clients. We write emails and social posts that they can share with their network. It matters because, you know, most people only talk to one lender before they buy a home, and they actually end up paying more than they need to. So if we can, like, put better information in front of them earlier, they make a better decision. And for the loan officer it means they get more referrals without having to cold call. I think the part I enjoy most is seeing which emails actually work, and then doing more of that.";
