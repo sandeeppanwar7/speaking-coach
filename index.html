@@ -6,15 +6,15 @@
 <title>Speaking Coach</title>
 <meta name="description" content="Practice speaking out loud and get scored on pace, filler words, reading accuracy, pitch range, pauses and volume. Free and open source.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@500;700&family=Mukta:wght@400;600;700;800&display=swap">
 <style>
 /* Layout: one narrow working column; mode tabs on top, scorecard of gauge rows below, history last. */
 :root {
   --bg: #F2F5F7; --surface: #FFFFFF; --ink: #15202A; --muted: #5A6774; --line: #D8E0E7;
   --accent: #0B7A75; --accent-ink: #FFFFFF; --band: #CBE8E3;
   --good: #2C7A4B; --warn: #A86B12; --bad: #B33A3A;
-  --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
-  --body: "Atkinson Hyperlegible", system-ui, -apple-system, sans-serif;
+  --display: "Bricolage Grotesque", "Mukta", "Avenir Next", system-ui, sans-serif;
+  --body: "Atkinson Hyperlegible", "Mukta", system-ui, -apple-system, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
@@ -31,6 +31,11 @@
 :root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px) }
 body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.55 var(--body) }
 .voice-block { display: grid; gap: 14px; border-top: 1px solid var(--line); padding-top: 18px }
+.top { display: grid; gap: 4px }
+.lang-switch { justify-self: end; margin-bottom: 4px }
+/* Letter-spacing breaks Devanagari conjuncts, and Hindi needs a little more line height */
+html[lang="hi"] * { letter-spacing: 0 !important }
+html[lang="hi"] body { line-height: 1.7 }
 footer { color: var(--muted); font-size: 14px; text-align: center }
 footer a { color: var(--accent) }
 .wrap { max-width: 860px; margin: 0 auto; padding-block: 28px 64px;
@@ -230,7 +235,11 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
 <body>
 
 <div class="wrap">
-  <header>
+  <header class="top">
+    <div class="seg lang-switch" id="langSwitch" role="group" aria-label="Language / भाषा">
+      <button class="seg-btn" data-lang="en" aria-pressed="true">English</button>
+      <button class="seg-btn" data-lang="hi" lang="hi" aria-pressed="false">हिन्दी</button>
+    </div>
     <h1>Speaking Coach</h1>
     <p class="lede">Read a passage or answer a prompt out loud, then see your pace, filler words, pitch and pauses scored against the ranges good speakers fall into. Each run is saved to your history in this browser so you can watch the numbers move.</p>
   </header>
@@ -690,6 +699,8 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
 </div>
 
 <script src="passages.js"></script>
+<script src="passages-hi.js"></script>
+<script src="i18n-hi.js"></script>
 <script>
 (function () {
   const $ = (id) => document.getElementById(id);
@@ -697,33 +708,94 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
   const fmtTime = (s) => Math.floor(s / 60) + ":" + String(Math.floor(s % 60)).padStart(2, "0");
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
+  // ---------- language ----------
+  // English text is the key; window.HINDI_UI maps it to Hindi. {name} placeholders are filled from vars.
+  const LANG_KEY = "speaking-coach.lang";
+  let lang = (() => {
+    try { const v = localStorage.getItem(LANG_KEY); if (v === "en" || v === "hi") return v; } catch (e) {}
+    return (navigator.language || "").toLowerCase().startsWith("hi") ? "hi" : "en";
+  })();
+  const HI = window.HINDI_UI || {};
+  const t = (s, vars) => {
+    let out = lang === "hi" && HI[s] != null ? HI[s] : s;
+    if (vars) out = out.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? vars[k] : m));
+    return out;
+  };
+  const refreshers = [];
+  const onLang = (f) => refreshers.push(f);
+
+  // Static page text: every element whose content is plain text plus inline tags gets swapped as a whole.
+  const INLINE = new Set(["B", "STRONG", "EM", "I", "SPAN", "SMALL", "A", "BR", "Q", "CODE", "MARK"]);
+  const SKIP_IDS = new Set(["liveResults", "fileResults", "history", "routine", "transcript", "coachOut", "passage", "paceText", "twister", "passageCat", "promptText", "passageTitle", "drillSummary", "streakNum", "recStatus", "recLabel", "timer", "breathBtn", "breathPhase", "breathCount", "breathLeft", "twisterPos", "paceBtn", "minuteTopic", "minuteClock", "minuteBtn", "tallyNum", "minuteResult", "coachBtn", "coachNote", "clearHist", "langSwitch"]);
+  const SKIP_CLASSES = ["done-btn", "timer-btn", "sw-btn", "sw-best", "sw-time"];
+  const staticEls = [];
+  const skipped = (el) => (el.id && SKIP_IDS.has(el.id)) || SKIP_CLASSES.some((c) => el.classList.contains(c));
+  (function collect(root) {
+    for (const el of root.children) {
+      if (skipped(el) || /^(SCRIPT|STYLE|CANVAS|TEXTAREA|INPUT)$/.test(el.tagName) || el instanceof SVGElement) continue;
+      if (el.textContent.trim() && [...el.querySelectorAll("*")].every((d) => INLINE.has(d.tagName) && !skipped(d))) staticEls.push([el, el.innerHTML.replace(/\s+/g, " ").trim()]);
+      else collect(el);
+    }
+  })(document.querySelector(".wrap"));
+  function applyStatic() {
+    document.documentElement.lang = lang;
+    staticEls.forEach(([el, src]) => { el.innerHTML = lang === "hi" && HI[src] != null ? HI[src] : src; });
+    $("pasteText").placeholder = t("Paste what you said...");
+    document.querySelectorAll("#langSwitch [data-lang]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.lang === lang));
+  }
+  function setLang(l) {
+    if (l === lang) return;
+    stopEverything();
+    lang = l;
+    try { localStorage.setItem(LANG_KEY, l); } catch (e) {}
+    applyStatic();
+    refreshers.forEach((f) => f());
+  }
+  document.querySelectorAll("#langSwitch [data-lang]").forEach((b) => b.addEventListener("click", () => setLang(b.dataset.lang)));
+
   // ---------- tabs ----------
   const tabs = [["tab-live", "panel-live"], ["tab-file", "panel-file"], ["tab-drills", "panel-drills"], ["tab-tips", "panel-tips"], ["tab-voice", "panel-voice"]];
   function showTab(id) {
-    tabs.forEach(([t, p]) => { const on = t === id; $(t).setAttribute("aria-selected", on); $(p).hidden = !on; });
+    tabs.forEach(([tb, p]) => { const on = tb === id; $(tb).setAttribute("aria-selected", on); $(p).hidden = !on; });
     charts.forEach(([r, cv]) => drawChart(r, cv));
   }
-  tabs.forEach(([t]) => $(t).addEventListener("click", () => showTab(t)));
+  tabs.forEach(([tb]) => $(tb).addEventListener("click", () => showTab(tb)));
   document.querySelectorAll(".jump a").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); document.querySelector(a.getAttribute("href")).scrollIntoView({ behavior: "smooth", block: "start" }); }));
 
   // ---------- prompts ----------
-  const PROMPTS = [
-    "What do you do at work, and why does it matter?",
-    "Give a one-minute update on a project you're working on.",
-    "Describe a problem you solved recently and how you did it.",
-    "Explain your company to someone who has never heard of it.",
-    "Disagree politely with a decision your manager made.",
-    "Tell a short story about a mistake you learned from.",
-    "Pitch an idea that would save your team time.",
-    "Introduce yourself at the start of a client call.",
-    "What's one thing you'd change about how meetings run, and why?",
-    "Explain a technical topic you know well to a beginner.",
-  ];
+  const PROMPTS = {
+    en: [
+      "What do you do at work, and why does it matter?",
+      "Give a one-minute update on a project you're working on.",
+      "Describe a problem you solved recently and how you did it.",
+      "Explain your company to someone who has never heard of it.",
+      "Disagree politely with a decision your manager made.",
+      "Tell a short story about a mistake you learned from.",
+      "Pitch an idea that would save your team time.",
+      "Introduce yourself at the start of a client call.",
+      "What's one thing you'd change about how meetings run, and why?",
+      "Explain a technical topic you know well to a beginner.",
+    ],
+    hi: [
+      "आप काम पर क्या करते हैं, और वह क्यों ज़रूरी है?",
+      "जिस प्रोजेक्ट पर आप काम कर रहे हैं, उसका एक मिनट का अपडेट दीजिए।",
+      "हाल ही में आपने कौन सी समस्या सुलझाई, और कैसे?",
+      "अपनी कंपनी के बारे में ऐसे व्यक्ति को बताइए जिसने उसका नाम कभी नहीं सुना।",
+      "अपने मैनेजर के किसी फ़ैसले से विनम्रता से असहमति जताइए।",
+      "किसी ऐसी गलती की छोटी सी कहानी सुनाइए जिससे आपने कुछ सीखा।",
+      "एक ऐसा सुझाव दीजिए जिससे आपकी टीम का समय बचे।",
+      "किसी क्लाइंट कॉल की शुरुआत में अपना परिचय दीजिए।",
+      "मीटिंग के तरीके में आप क्या बदलना चाहेंगे, और क्यों?",
+      "कोई ऐसा विषय जो आप अच्छी तरह जानते हैं, किसी नए व्यक्ति को समझाइए।",
+    ],
+  };
   let promptIdx = 0;
-  $("newPrompt").onclick = () => { promptIdx = (promptIdx + 1 + Math.floor(Math.random() * (PROMPTS.length - 1))) % PROMPTS.length; $("promptText").textContent = PROMPTS[promptIdx]; };
+  const renderPrompt = () => { $("promptText").textContent = PROMPTS[lang][promptIdx % PROMPTS[lang].length]; };
+  $("newPrompt").onclick = () => { const n = PROMPTS[lang].length; promptIdx = (promptIdx + 1 + Math.floor(Math.random() * (n - 1))) % n; renderPrompt(); };
+  onLang(renderPrompt);
 
   // ---------- reading passages: "/" marks a pause, *word* marks stress ----------
-  const PASSAGES = [
+  const PASSAGES_EN = [
     ["Team update", "Good morning, everyone. / Quick update on the *spring* campaign. / We sent the first email on Tuesday, / and the results are *better* than we expected. / More than a third of people opened it, / and the click rate was *twice* our usual number. / The subject line did most of the work. / It was short, / it was specific, / and it asked a question. / Next week we will test the *same* idea on social. / If it holds up there, / I want to make it our default approach. / The one risk is timing. / We need design support by *Thursday*, / or the posts slip to the following week. / So my ask today is simple. / Can someone from design give me *two* hours this week? / That is all it takes to keep us on track."],
     ["Explaining a big decision", "Buying your first home is one of the *biggest* decisions you will ever make, / and most people do it with very little help. / They talk to *one* lender, / accept the first rate they are offered, / and hope for the best. / That is where things go wrong. / A small difference in your rate / can add up to *thousands* of dollars over the life of a loan. / So before you sign anything, / ask three questions. / What is my *total* cost, not just my monthly payment? / What happens if I want to move in five years? / And what *other* options should I be looking at? / A good advisor will answer all three / without making you feel rushed. / If they cannot, / that tells you *everything* you need to know."],
     ["A short story", "The first time I gave a presentation at work, / I was *terrified*. / I had practiced for a week, / but the moment I stood up, / my mind went completely *blank*. / I looked down at my notes / and the words just swam on the page. / So I did the only thing I could think of. / I *stopped*. / I took one slow breath, / looked at the person in the front row, / and said, / let me start with the part I care about most. / And then I just *talked*. / Not perfectly, / but honestly. / Afterward, my manager told me it was the *best* part of the meeting. / I learned something that day. / People do not need you to be perfect. / They need you to be *clear*, / and they need you to *mean* it."],
@@ -732,14 +804,15 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
     ["A quick pitch", "Every week, our team spends *hours* on the same report. / We copy numbers from four different tools, / paste them into a spreadsheet, / and fix the mistakes by hand. / I think we can get that time *back*. / Here is my idea. / We connect those four tools *once*, / and build a simple dashboard that updates on its own. / No copying, / no pasting, / and far fewer mistakes. / I have already built a rough version, / and it took me *one* afternoon. / If we spend two more weeks on it, / I believe we save at least *five* hours a week across the team. / That is more than *two hundred* hours a year. / I would love *ten* minutes on Friday / to show you how it works."],
   ];
   const BASE_CATS = ["Work updates", "Explaining", "Stories", "Presentations", "Speeches", "Persuasion"];
-  PASSAGES.forEach((p, i) => { p[2] = BASE_CATS[i]; });
-  (window.EXTRA_PASSAGES || []).forEach((p) => PASSAGES.push(p));
-  const CATEGORIES = [...new Set(PASSAGES.map((p) => p[2]))].sort();
+  PASSAGES_EN.forEach((p, i) => { p[2] = BASE_CATS[i]; });
+  (window.EXTRA_PASSAGES || []).forEach((p) => PASSAGES_EN.push(p));
+  const PASSAGES_HI = window.HINDI_PASSAGES && window.HINDI_PASSAGES.length ? window.HINDI_PASSAGES : PASSAGES_EN;
+  let PASSAGES = lang === "hi" ? PASSAGES_HI : PASSAGES_EN;
 
-  // Shuffle bag per topic: every passage in the topic comes up once, in random order, before any repeats.
+  // Shuffle bag per language and topic: every passage in the topic comes up once, in random order, before any repeats.
   const bags = {};
   function nextIdx(cur, cat, key) {
-    const k = key + "|" + cat;
+    const k = lang + "|" + key + "|" + cat;
     if (!bags[k] || !bags[k].length) {
       const bag = PASSAGES.map((_, i) => i).filter((i) => (cat === "All" || PASSAGES[i][2] === cat) && i !== cur);
       for (let i = bag.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [bag[i], bag[j]] = [bag[j], bag[i]]; }
@@ -749,8 +822,15 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
   }
   let readCat = "All";
   let passageIdx = nextIdx(-1, readCat, "read"), mode = "read";
-  CATEGORIES.forEach((c) => { const o = document.createElement("option"); o.value = c; o.textContent = `${c} (${PASSAGES.filter((p) => p[2] === c).length})`; $("passageCat").appendChild(o); });
-  $("passageCat").options[0].textContent = `All topics (${PASSAGES.length})`;
+  function buildCats() {
+    const sel = $("passageCat"), cats = [...new Set(PASSAGES.map((p) => p[2]))].sort();
+    sel.innerHTML = "";
+    [["All", t("All topics ({n})", { n: PASSAGES.length })]].concat(cats.map((c) => [c, `${t(c)} (${PASSAGES.filter((p) => p[2] === c).length})`])).forEach(([v, label]) => {
+      const o = document.createElement("option"); o.value = v; o.textContent = label; sel.appendChild(o);
+    });
+    if (!cats.includes(readCat)) readCat = "All";
+    sel.value = readCat;
+  }
   $("passageCat").onchange = (e) => { readCat = e.target.value; passageIdx = nextIdx(-1, readCat, "read"); renderPassage(); };
   const scriptText = () => PASSAGES[passageIdx][1];
   function renderPassage(missedSet) {
@@ -760,23 +840,33 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
       const n = wordsOf(tok.replace(/'/g, "")).length;
       const missed = missedSet && [...Array(n).keys()].some((k) => missedSet.has(wi + k));
       wi += n;
-      let h = esc(tok).replace(/\*(.+?)\*/g, "<strong>$1</strong>");
+      const h = esc(tok).replace(/\*(.+?)\*/g, "<strong>$1</strong>");
       return missed ? `<span class="missed">${h}</span>` : h;
     }).join(" ");
     $("passage").innerHTML = html;
-    $("passageTitle").textContent = "Read this aloud · " + PASSAGES[passageIdx][0];
+    $("passageTitle").textContent = t("Read this aloud") + " · " + PASSAGES[passageIdx][0];
   }
   $("nextPassage").onclick = () => { passageIdx = nextIdx(passageIdx, readCat, "read"); renderPassage(); };
   function setMode(m) {
     mode = m;
     $("modeRead").setAttribute("aria-pressed", m === "read"); $("modeTalk").setAttribute("aria-pressed", m === "talk");
     $("readBox").hidden = m !== "read"; $("talkBox").hidden = m !== "talk";
-    $("recStatus").textContent = m === "read" ? "Read the passage at a natural pace." : "Aim for 60 to 90 seconds.";
+    $("recStatus").textContent = m === "read" ? t("Read the passage at a natural pace.") : t("Aim for 60 to 90 seconds.");
   }
   $("modeRead").onclick = () => setMode("read");
   $("modeTalk").onclick = () => setMode("talk");
+  onLang(() => {
+    PASSAGES = lang === "hi" ? PASSAGES_HI : PASSAGES_EN;
+    buildCats();
+    passageIdx = nextIdx(-1, readCat, "read");
+    renderPassage();
+    setMode(mode);
+  });
 
-  // word-level alignment (longest common subsequence) of what was said against the script
+  // ---------- word matching for reading accuracy ----------
+  const wordsOf = (s) => s.toLowerCase().match(/[\p{L}\p{M}\p{N}']+/gu) || [];
+  // Hindi speech-to-text spells some sounds differently from printed text: drop nukta, treat chandrabindu as anusvara.
+  const normWord = (s) => s.normalize("NFC").replace(/़/g, "").replace(/ँ/g, "ं").replace(/[‌‍]/g, "");
   const ONES = "zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen".split(" ");
   const TENS = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
   function numWords(n) {
@@ -786,11 +876,13 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
     if (n < 1e6) return numWords(Math.floor(n / 1000)) + " thousand" + (n % 1000 ? " " + numWords(n % 1000) : "");
     return String(n);
   }
-  const spellNumbers = (t) => t.replace(/\d[\d,]*/g, (m) => numWords(Number(m.replace(/,/g, "")))).replace(/%/g, " percent");
+  const HI_NUMS = "शून्य एक दो तीन चार पांच छह सात आठ नौ दस ग्यारह बारह तेरह चौदह पंद्रह सोलह सत्रह अठारह उन्नीस बीस इक्कीस बाईस तेईस चौबीस पच्चीस छब्बीस सत्ताईस अट्ठाईस उनतीस तीस इकतीस बत्तीस तैंतीस चौंतीस पैंतीस छत्तीस सैंतीस अड़तीस उनतालीस चालीस इकतालीस बयालीस तैंतालीस चवालीस पैंतालीस छियालीस सैंतालीस अड़तालीस उनचास पचास इक्यावन बावन तिरपन चौवन पचपन छप्पन सत्तावन अट्ठावन उनसठ साठ इकसठ बासठ तिरसठ चौंसठ पैंसठ छियासठ सड़सठ अड़सठ उनहत्तर सत्तर इकहत्तर बहत्तर तिहत्तर चौहत्तर पचहत्तर छिहत्तर सतहत्तर अठहत्तर उन्यासी अस्सी इक्यासी बयासी तिरासी चौरासी पचासी छियासी सत्तासी अट्ठासी नवासी नब्बे इक्यानबे बानबे तिरानबे चौरानबे पंचानबे छियानबे सत्तानबे अट्ठानबे निन्यानबे सौ".split(" ");
+  const spellNumbers = (s) => lang === "hi"
+    ? s.replace(/\d+/g, (m) => (Number(m) <= 100 ? HI_NUMS[Number(m)] : m)).replace(/%/g, " प्रतिशत")
+    : s.replace(/\d[\d,]*/g, (m) => numWords(Number(m.replace(/,/g, "")))).replace(/%/g, " percent");
   function alignScript(script, said) {
-    said = spellNumbers(said);
-    const norm = (t) => wordsOf(t.replace(/'/g, ""));
-    const a = norm(script), b = norm(said), n = a.length, m = b.length;
+    const norm = (s) => wordsOf(s.replace(/'/g, "")).map(normWord);
+    const a = norm(script), b = norm(spellNumbers(said)), n = a.length, m = b.length;
     const T = new Uint16Array((n + 1) * (m + 1)), W = m + 1;
     for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--)
       T[i * W + j] = a[i] === b[j] ? T[(i + 1) * W + j + 1] + 1 : Math.max(T[(i + 1) * W + j], T[i * W + j + 1]);
@@ -809,56 +901,78 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
     const d = v < lo ? lo - v : v - hi;
     return clamp(Math.round(100 - d * perUnit), 0, 100);
   }
-  function verdict(score) { return score >= 80 ? ["good", "On target"] : score >= 50 ? ["warn", "Work on it"] : ["bad", "Focus here"]; }
+  function verdict(score) { return score >= 80 ? ["good", t("On target")] : score >= 50 ? ["warn", t("Work on it")] : ["bad", t("Focus here")]; }
   function metricRow(m) {
     const span = m.max - m.min;
     const pct = (v) => clamp(((v - m.min) / span) * 100, 0, 100);
     const [cls, word] = m.chip || verdict(m.score);
-    const gauge = m.value == null ? '<p class="note">Not enough data</p>' :
-      `<div class="gauge" role="img" aria-label="${esc(m.name)} ${esc(m.display)}, target ${m.lo} to ${m.hi}">
+    const gauge = m.value == null ? `<p class="note">${t("Not enough data")}</p>` :
+      `<div class="gauge" role="img" aria-label="${esc(m.name)} ${esc(m.display)}, ${esc(t("target"))} ${m.lo}–${m.hi}">
         <div class="band" style="left:${pct(m.lo)}%;width:${pct(m.hi) - pct(m.lo)}%"></div>
         <div class="mark" style="left:${pct(m.value)}%"></div></div>
-       <div class="gauge-scale"><span>${m.min}</span><span>target ${m.lo}–${m.hi}${m.unit ? " " + esc(m.unit) : ""}</span><span>${m.max}</span></div>`;
+       <div class="gauge-scale"><span>${m.min}</span><span>${t("target")} ${m.lo}–${m.hi}${m.unit ? " " + esc(m.unit) : ""}</span><span>${m.max}</span></div>`;
     return `<div class="metric">
       <div><div class="name">${esc(m.name)}</div><div class="val">${esc(m.display)}<small>${esc(m.unit || "")}</small></div></div>
       <div class="gwrap">${gauge}</div>
-      <span class="chip ${cls}">${word}</span>
+      <span class="chip ${cls}">${esc(word)}</span>
       <p class="tip">${esc(m.tip)}</p></div>`;
   }
   function ring(score) {
     const c = 2 * Math.PI * 46;
-    return `<svg class="ring" viewBox="0 0 112 112" role="img" aria-label="Overall score ${score} out of 100">
+    return `<svg class="ring" viewBox="0 0 112 112" role="img" aria-label="${esc(t("Overall score {n} out of 100", { n: score }))}">
       <circle class="track" cx="56" cy="56" r="46"></circle>
       <circle class="val" cx="56" cy="56" r="46" stroke-dasharray="${c}" stroke-dashoffset="${c * (1 - score / 100)}"></circle>
       <text x="56" y="56">${score}</text></svg>`;
   }
+  const paceChip = (wpm, score) => wpm > 160 ? (score >= 50 ? ["warn", t("A bit fast")] : ["bad", t("Too fast")]) : wpm < 130 ? (score >= 50 ? ["warn", t("A bit slow")] : ["bad", t("Too slow")]) : null;
 
   // ---------- transcript analysis ----------
-  const FILLERS = [
-    ["um", /\b(?:u+m+|e+r+m+|h+m+)\b/gi],
-    ["uh", /\b(?:u+h+|e+r+|a+h+)\b/gi],
-    ["like", /(?:^|[,.!?]\s*)like\b|\blike(?=,)/gim],
-    ["you know", /\byou know\b(?!\s+(?:what|how|that|why|when|where|who))/gi],
-    ["I mean", /\bi mean\b/gi],
-    ["basically", /\bbasically\b/gi],
-    ["actually", /\bactually\b/gi],
-    ["literally", /\bliterally\b/gi],
-    ["kind of / sort of", /\b(?:kind|sort) of\b/gi],
-    ["so (to start)", /(?:^|[.!?]\s+)so\b/gim],
-    ["right?", /\bright\?/gi],
-  ];
-  const STOP = new Set("the a an and or but so to of in on at for with is are was were be been it its this that these those i we you they he she my our your their me us them as by from not no do does did have has had will would can could should just very really there here what which who when where how than then also about into out up if all more some any one".split(" "));
-  const wordsOf = (t) => t.toLowerCase().match(/[a-z0-9']+/g) || [];
+  // Devanagari has no \b word boundary in JS regex, so Hindi patterns use letter lookarounds.
+  const hw = (p) => new RegExp("(?<![\\p{L}\\p{M}])(?:" + p + ")(?![\\p{L}\\p{M}])", "giu");
+  const FILLERS = {
+    en: [
+      ["um", /\b(?:u+m+|e+r+m+|h+m+)\b/gi],
+      ["uh", /\b(?:u+h+|e+r+|a+h+)\b/gi],
+      ["like", /(?:^|[,.!?]\s*)like\b|\blike(?=,)/gim],
+      ["you know", /\byou know\b(?!\s+(?:what|how|that|why|when|where|who))/gi],
+      ["I mean", /\bi mean\b/gi],
+      ["basically", /\bbasically\b/gi],
+      ["actually", /\bactually\b/gi],
+      ["literally", /\bliterally\b/gi],
+      ["kind of / sort of", /\b(?:kind|sort) of\b/gi],
+      ["so (to start)", /(?:^|[.!?]\s+)so\b/gim],
+      ["right?", /\bright\?/gi],
+    ],
+    hi: [
+      ["अं / हम्म", hw("अं+|उं+|उम्+|अम्+|हम्+|हम्म+|um+|uh+|hmm+")],
+      ["मतलब", hw("मतलब")],
+      ["यानी", hw("यानी|यानि")],
+      ["वो क्या है / क्या कहते हैं", hw("वो क्या है|क्या कहते हैं")],
+      ["है ना", hw("है ना")],
+      ["एक्चुअली", hw("एक्चुअली|actually")],
+      ["बेसिकली", hw("बेसिकली|basically")],
+      ["लाइक", hw("लाइक|like")],
+      ["तो (शुरुआत में)", new RegExp("(?:^|[।.!?]\\s+)तो(?![\\p{L}\\p{M}])", "gmu")],
+    ],
+  };
+  const HIGHLIGHT = {
+    en: /\b(um+|uh+|erm+|er+|ah+|hmm+|basically|actually|literally|you know|i mean|kind of|sort of)\b/gi,
+    hi: hw("अं+|उं+|उम्+|हम्म+|मतलब|यानी|यानि|वो क्या है|क्या कहते हैं|है ना|एक्चुअली|बेसिकली|लाइक|um+|uh+|hmm+|basically|actually|like"),
+  };
+  const STOP = new Set(("the a an and or but so to of in on at for with is are was were be been it its this that these those i we you they he she my our your their me us them as by from not no do does did have has had will would can could should just very really there here what which who when where how than then also about into out up if all more some any one " +
+    "है हैं था थे थी हो होता होती होते का की के को में से पर और या तो यह वह ये वो एक भी नहीं हम मैं आप तुम उस इस उन इन कि जो जब तक लिए साथ कर करना करते करता रहा रही रहे गया गई गए ने ही बहुत कुछ सब अपने अपना अपनी मेरा मेरी मेरे हमारा हमारी हमारे आपका आपकी आपके क्या कैसे क्यों कब कहाँ अब फिर लेकिन पर ना").split(" "));
 
   function analyzeText(text, seconds, script) {
     const words = wordsOf(text);
     const n = words.length, mins = seconds / 60;
     const wpm = mins > 0 ? Math.round(n / mins) : 0;
     const fillerHits = [];
-    FILLERS.forEach(([name, re]) => { const c = (text.match(re) || []).length; if (c) fillerHits.push([name, c]); });
+    // When reading a passage, fillers that are part of the passage itself don't count.
+    const plainScript = script ? script.replace(/\s\/\s/g, " ").replace(/\*/g, "") : "";
+    FILLERS[lang].forEach(([name, re]) => { const c = (text.match(re) || []).length - (plainScript.match(re) || []).length; if (c > 0) fillerHits.push([name, c]); });
     const fillers = fillerHits.reduce((a, [, c]) => a + c, 0);
     const fpm = mins > 0 ? fillers / mins : 0;
-    const sentences = text.split(/[.!?]+/).map((s) => s.trim()).filter((s) => wordsOf(s).length > 0);
+    const sentences = text.split(/[.!?।॥]+/).map((s) => s.trim()).filter((s) => wordsOf(s).length > 0);
     const punctuated = sentences.length >= 2 || n < 30;
     const avgSent = punctuated ? n / Math.max(1, sentences.length) : null;
     let variety;
@@ -868,6 +982,7 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
     const counts = {};
     words.forEach((w) => { if (!STOP.has(w) && w.length > 2) counts[w] = (counts[w] || 0) + 1; });
     const leaned = Object.entries(counts).filter(([, c]) => c >= 3 && c / n >= 0.02).sort((a, b) => b[1] - a[1]).slice(0, 6);
+    const foundList = fillerHits.map(([k, c]) => `${k} ×${c}`).join(", ");
 
     const paceScore = bandScore(wpm, 130, 160, 2);
     const fillScore = clamp(Math.round(100 - Math.max(0, fpm - 2) * 15), 0, 100);
@@ -881,62 +996,59 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
     const overall = Math.round(parts.reduce((a, [s, w]) => a + s * w, 0) / parts.reduce((a, [, w]) => a + w, 0));
 
     const metrics = [
-      { name: "Pace", value: wpm, display: String(wpm), unit: "wpm", min: 60, max: 240, lo: 130, hi: 160, score: paceScore,
-        chip: wpm > 160 ? (paceScore >= 50 ? ["warn", "A bit fast"] : ["bad", "Too fast"]) : wpm < 130 ? (paceScore >= 50 ? ["warn", "A bit slow"] : ["bad", "Too slow"]) : null,
-        tip: wpm > 160 ? "Slow down. Pause for a full breath after each main point, and stress one word per sentence." :
-             wpm < 130 ? "Pick up the pace a little. Know your next point before you finish the current one." :
-             "A comfortable pace that's easy to follow." },
-      { name: "Filler words", value: Math.round(fpm * 10) / 10, display: (Math.round(fpm * 10) / 10).toFixed(1), unit: "per min", min: 0, max: 12, lo: 0, hi: 2, score: fillScore,
-        tip: fillers ? "Found: " + fillerHits.map(([k, c]) => `${k} ×${c}`).join(", ") + ". Replace each one with a silent pause." : "No filler words detected. Speech-to-text can drop \"um\" and \"uh\", so a recording is a stricter check." },
-      { name: "Sentence length", value: avgSent == null ? null : Math.round(avgSent), display: avgSent == null ? "n/a" : String(Math.round(avgSent)), unit: avgSent == null ? "" : "words", min: 0, max: 40, lo: 10, hi: 20, score: sentScore ?? 0,
-        chip: avgSent == null ? ["warn", "No punctuation"] : null,
-        tip: avgSent == null ? "The transcript has no sentence breaks, so this couldn't be measured." :
-             avgSent > 20 ? "Your sentences run long. Break them up: one idea per sentence, then stop." :
-             avgSent < 10 ? "Very short sentences can sound choppy. Join related ideas with \"because\" or \"which means\"." :
-             "Sentences are a good length to follow by ear." },
-      { name: "Word variety", value: Math.round(variety * 100), display: Math.round(variety * 100) + "%", unit: "", min: 40, max: 100, lo: 72, hi: 100, score: varScore,
-        tip: leaned.length ? "You leaned on a few words; see the list below. Have one or two alternatives ready for each." : "Good range of vocabulary for spoken English." },
+      { name: t("Pace"), value: wpm, display: String(wpm), unit: t("wpm"), min: 60, max: 240, lo: 130, hi: 160, score: paceScore, chip: paceChip(wpm, paceScore),
+        tip: wpm > 160 ? t("Slow down. Pause for a full breath after each main point, and stress one word per sentence.") :
+             wpm < 130 ? t("Pick up the pace a little. Know your next point before you finish the current one.") :
+             t("A comfortable pace that's easy to follow.") },
+      { name: t("Filler words"), value: Math.round(fpm * 10) / 10, display: (Math.round(fpm * 10) / 10).toFixed(1), unit: t("per min"), min: 0, max: 12, lo: 0, hi: 2, score: fillScore,
+        tip: fillers ? t("Found: {list}. Replace each one with a silent pause.", { list: foundList }) : t("No filler words detected. Speech-to-text can drop \"um\" and \"uh\", so a recording is a stricter check.") },
+      { name: t("Sentence length"), value: avgSent == null ? null : Math.round(avgSent), display: avgSent == null ? "–" : String(Math.round(avgSent)), unit: avgSent == null ? "" : t("words"), min: 0, max: 40, lo: 10, hi: 20, score: sentScore ?? 0,
+        chip: avgSent == null ? ["warn", t("No punctuation")] : null,
+        tip: avgSent == null ? t("The transcript has no sentence breaks, so this couldn't be measured.") :
+             avgSent > 20 ? t("Your sentences run long. Break them up: one idea per sentence, then stop.") :
+             avgSent < 10 ? t("Very short sentences can sound choppy. Join related ideas with \"because\" or \"which means\".") :
+             t("Sentences are a good length to follow by ear.") },
+      { name: t("Word variety"), value: Math.round(variety * 100), display: Math.round(variety * 100) + "%", unit: "", min: 40, max: 100, lo: 72, hi: 100, score: varScore,
+        tip: leaned.length ? t("You leaned on a few words; see the list below. Have one or two alternatives ready for each.") : t("Good range of vocabulary.") },
     ];
     if (align) {
       const uniqMissed = [...new Set(align.missedWords)].slice(0, 8);
-      metrics.splice(2, 2, { name: "Reading accuracy", value: accuracy, display: accuracy + "%", unit: "", min: 60, max: 100, lo: 95, hi: 100, score: accScore,
-        tip: align.missed.size ? `${align.missed.size} of ${align.total} words were skipped or not heard clearly (crossed out in the passage above): ${uniqMissed.join(", ")}. Slow down on those and finish each word's last sound.` : "Every word came through clearly." });
-      metrics[1].tip = fillers ? "Found: " + fillerHits.map(([k, c]) => `${k} ×${c}`).join(", ") + ". None of these are in the passage, so they're habits slipping in." : "No filler words slipped in.";
+      metrics.splice(2, 2, { name: t("Reading accuracy"), value: accuracy, display: accuracy + "%", unit: "", min: 60, max: 100, lo: 95, hi: 100, score: accScore,
+        tip: align.missed.size ? t("{n} of {total} words were skipped or not heard clearly (crossed out in the passage above): {words}. Slow down on those and finish each word's last sound.", { n: align.missed.size, total: align.total, words: uniqMissed.join(", ") }) : t("Every word came through clearly.") });
+      metrics[1].tip = fillers ? t("Found: {list}. None of these are in the passage, so they're habits slipping in.", { list: foundList }) : t("No filler words slipped in.");
     }
-    return { kind: "live", text, seconds, n, wpm, fpm, fillers, avgSent, variety, leaned: align ? [] : leaned, metrics, overall, align, accuracy, script };
+    return { text, seconds, n, wpm, fpm, fillers, avgSent, variety, leaned: align ? [] : leaned, metrics, overall, align, accuracy, script };
   }
 
-  function highlight(text) {
-    let html = esc(text);
-    const re = /\b(um+|uh+|erm+|er+|ah+|hmm+|basically|actually|literally|you know|i mean|kind of|sort of)\b/gi;
-    return html.replace(re, "<mark>$1</mark>");
-  }
+  const highlight = (text) => esc(text).replace(HIGHLIGHT[lang], "<mark>$&</mark>");
 
+  let liveIsExample = true;
   function renderLive(r, isExample) {
+    liveIsExample = isExample;
     const head = isExample
-      ? `<span class="example-flag">Example session</span><p class="note">This is a sample result so you can see the scorecard. Press Start speaking to replace it with your own.</p>`
-      : `<p class="note">${r.n} words in ${fmtTime(r.seconds)}.</p>`;
+      ? `<span class="example-flag">${t("Example session")}</span><p class="note">${t("This is a sample result so you can see the scorecard. Press Start speaking to replace it with your own.")}</p>`
+      : `<p class="note">${t("{n} words in {time}.", { n: r.n, time: fmtTime(r.seconds) })}</p>`;
     const weakest = r.metrics.filter((m) => m.value != null).sort((a, b) => a.score - b.score)[0];
     $("liveResults").innerHTML = `
       <div class="score-head">${ring(r.overall)}
-        <div class="sum"><span class="label">Overall</span><h2>${r.overall >= 80 ? "Clear and well paced" : r.overall >= 60 ? "Solid, with one thing to fix" : "Room to grow"}</h2>
-        <p>Biggest win next time: <b>${esc(weakest.name.toLowerCase())}</b>.</p>${head}</div></div>
+        <div class="sum"><span class="label">${t("Overall")}</span><h2>${r.overall >= 80 ? t("Clear and well paced") : r.overall >= 60 ? t("Solid, with one thing to fix") : t("Room to grow")}</h2>
+        <p>${t("Biggest win next time:")} <b>${esc(weakest.name.toLowerCase())}</b></p>${head}</div></div>
       <div class="metrics">${r.metrics.map(metricRow).join("")}</div>
-      ${r.leaned.length ? `<div><span class="label">Words you leaned on</span><div class="leaned" style="margin-top:8px">${r.leaned.map(([w, c]) => `<span>${esc(w)} ×${c}</span>`).join("")}</div></div>` : ""}`;
+      ${r.leaned.length ? `<div><span class="label">${t("Words you leaned on")}</span><div class="leaned" style="margin-top:8px">${r.leaned.map(([w, c]) => `<span>${esc(w)} ×${c}</span>`).join("")}</div></div>` : ""}`;
     if (isExample) $("transcript").innerHTML = highlight(r.text);
     if (r.align && r.script === scriptText()) renderPassage(r.align.missed);
   }
   const currentScript = () => (mode === "read" ? scriptText() : null);
   const modeLabel = (r) => (r.align ? "Reading" : null);
 
-  // ---------- live dictation ----------
+  // ---------- live speech ----------
   let dict = null, listening = false, liveText = "", partial = "", listenStart = 0, listenedMs = 0, tick = null, lastLive = null;
   const renderTranscript = () => { $("transcript").innerHTML = highlight(liveText) + (partial ? `<span class="partial"> ${esc(partial)}</span>` : ""); $("transcript").scrollTop = 1e6; };
   const elapsed = () => (listenedMs + (listenStart ? performance.now() - listenStart : 0)) / 1000;
   function setRecUI(state) {
     listening = state !== "idle";
     $("recBtn").classList.toggle("live", state === "listening");
-    $("recLabel").textContent = state === "idle" ? "Start speaking" : state === "starting" ? "Starting..." : state === "finishing" ? "Finishing..." : "Stop";
+    $("recLabel").textContent = state === "idle" ? t("Start speaking") : state === "starting" ? t("Starting...") : state === "finishing" ? t("Finishing...") : t("Stop");
   }
   function finishLive(reason) {
     clearInterval(tick); tick = null;
@@ -946,29 +1058,31 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
     if (n >= 15 && secs >= 10) {
       lastLive = analyzeText(liveText.trim(), secs, currentScript());
       renderLive(lastLive, false);
-      saveHistory({ mode: modeLabel(lastLive) || "Live", score: lastLive.overall, wpm: lastLive.wpm, fpm: lastLive.fpm, extra: lastLive.n + " words" });
-      $("recStatus").textContent = "Scored. Try the same prompt again and compare.";
+      saveHistory({ mode: modeLabel(lastLive) || "Live", lang, score: lastLive.overall, wpm: lastLive.wpm, fpm: lastLive.fpm, words: lastLive.n });
+      $("recStatus").textContent = t("Scored. Try the same prompt again and compare.");
       $("coachOut").innerHTML = "";
       stopAudioCapture().then((blob) => {
         if (!blob || !blob.size) return;
         $("liveResults").insertAdjacentHTML("beforeend", '<div class="voice-block" id="liveVoice"></div>');
-        handleFile(blob, $("liveVoice"), "this session", true);
+        handleFile(blob, $("liveVoice"), t("this session"), true);
       });
       return;
     }
     stopAudioCapture();
-    if (reason !== "not_granted" && reason !== "unavailable" && reason !== "dismissed") {
-      $("recStatus").textContent = "Too short to score. Speak for at least 30 seconds.";
-    }
+    if (reason !== "not_granted" && reason !== "unavailable" && reason !== "dismissed") $("recStatus").textContent = t("Too short to score. Speak for at least 30 seconds.");
   }
-  const REASONS = { not_granted: "Microphone access is blocked. Allow it from the lock icon in your browser's address bar, or paste a transcript below.",
-    unavailable: "Live speech isn't available in this browser. Use Chrome, Edge or Safari, or paste a transcript below.",
-    dismissed: "No problem. Press Start speaking when you're ready.", rate_limited: "Too many dictation sessions at once. Try again in a moment.",
-    upstream_error: "The microphone or speech service stopped. Try again.", hidden: "Stopped because the page was hidden.", time_limit: "Reached the 60-minute limit." };
-
+  const REASONS = {
+    not_granted: "Microphone access is blocked. Allow it from the lock icon in your browser's address bar, or paste a transcript below.",
+    unavailable: "Live speech isn't available here for this language. Use Chrome, Edge or Safari, or paste a transcript below.",
+    dismissed: "No problem. Press Start speaking when you're ready.",
+    rate_limited: "Too many dictation sessions at once. Try again in a moment.",
+    upstream_error: "The microphone or speech service stopped. Try again.",
+    hidden: "Stopped because the page was hidden.",
+    time_limit: "Reached the 60-minute limit.",
+  };
   function noDictation() {
     $("recBtn").disabled = true;
-    $("recStatus").textContent = "Live speech needs Chrome, Edge or Safari. Paste a transcript below instead.";
+    $("recStatus").textContent = t("Live speech needs Chrome, Edge or Safari. Paste a transcript below instead.");
     $("pasteBox").open = true;
   }
 
@@ -976,8 +1090,8 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
     if (!dict) return;
     if (listening) { dict.stop().catch(() => {}); return; }
     liveText = ""; partial = ""; listenedMs = 0; listenStart = 0;
-    $("transcript").innerHTML = ""; $("timer").textContent = "0:00"; $("recStatus").textContent = "Listening...";
-    dict.start().catch((e) => { $("recStatus").textContent = REASONS[e.code] || "Couldn't start listening. Try again."; if (e.code === "unavailable" || e.code === "not_granted") $("pasteBox").open = true; });
+    $("transcript").innerHTML = ""; $("timer").textContent = "0:00"; $("recStatus").textContent = t("Listening...");
+    dict.start().catch((e) => { $("recStatus").textContent = REASONS[e.code] ? t(REASONS[e.code]) : t("Couldn't start listening. Try again."); if (e.code === "unavailable" || e.code === "not_granted") $("pasteBox").open = true; });
     startAudioCapture();
   });
 
@@ -991,7 +1105,8 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
     const setState = (s, reason) => { state = s; emit("state", { state: s, reason }); };
     const ERR = { "not-allowed": "not_granted", "service-not-allowed": "not_granted", "audio-capture": "not_granted", network: "upstream_error", "language-not-supported": "unavailable" };
     function make() {
-      rec = new SR(); rec.continuous = true; rec.interimResults = true; rec.lang = navigator.language || "en-US";
+      rec = new SR(); rec.continuous = true; rec.interimResults = true;
+      rec.lang = lang === "hi" ? "hi-IN" : /^en/i.test(navigator.language || "") ? navigator.language : "en-US";
       rec.onstart = () => { if (state === "starting") setState("listening"); };
       rec.onresult = (e) => {
         let interim = "";
@@ -1035,7 +1150,7 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
       const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
       mr = new MediaRecorder(stream);
       mr.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
-      mr.onstop = () => { recBlob = new Blob(chunks, { type: mr.mimeType }); stream.getTracks().forEach((t) => t.stop()); if (audioDone) { audioDone(recBlob); audioDone = null; } };
+      mr.onstop = () => { recBlob = new Blob(chunks, { type: mr.mimeType }); stream.getTracks().forEach((tr) => tr.stop()); if (audioDone) { audioDone(recBlob); audioDone = null; } };
       mr.start();
     } catch (e) { mr = null; }
   }
@@ -1043,45 +1158,60 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
     return new Promise((res) => { if (!mr || mr.state === "inactive") return res(recBlob); audioDone = res; mr.stop(); });
   }
 
-  {
-    const d = makeWebSpeech();
-    {
-      dict = d;
-      if (!d) noDictation(); else {
-      d.onPartial(({ text }) => { partial = text; renderTranscript(); });
-      d.onFinal(({ text }) => { liveText += liveText ? text : text.replace(/^\s+/, ""); partial = ""; renderTranscript(); });
-      d.onState(({ state, reason }) => {
-        setRecUI(state);
-        if (state === "listening") {
-          listenStart = performance.now();
-          tick = setInterval(() => { $("timer").textContent = fmtTime(elapsed()); }, 250);
-        } else if (state === "finishing") {
-          if (listenStart) { listenedMs += performance.now() - listenStart; listenStart = 0; }
-          clearInterval(tick); tick = null;
-        } else if (state === "idle") {
-          if (reason && REASONS[reason] && reason !== "stopped" && reason !== "viewer_stopped") $("recStatus").textContent = REASONS[reason];
-          finishLive(reason);
-        }
-      });
+  function wireDictation(d) {
+    dict = d;
+    if (!d) return noDictation();
+    d.onPartial(({ text }) => { partial = text; renderTranscript(); });
+    d.onFinal(({ text }) => { liveText += liveText ? text : text.replace(/^\s+/, ""); partial = ""; renderTranscript(); });
+    d.onState(({ state, reason }) => {
+      setRecUI(state);
+      if (state === "listening") {
+        listenStart = performance.now();
+        tick = setInterval(() => { $("timer").textContent = fmtTime(elapsed()); }, 250);
+      } else if (state === "finishing") {
+        if (listenStart) { listenedMs += performance.now() - listenStart; listenStart = 0; }
+        clearInterval(tick); tick = null;
+      } else if (state === "idle") {
+        if (reason && REASONS[reason]) $("recStatus").textContent = t(REASONS[reason]);
+        finishLive(reason);
       }
-    }
+    });
   }
+  // Inside claude.ai the platform's dictation is used; anywhere else, the browser's own speech recognition.
+  const cl = window.claude;
+  if (cl && cl.use) {
+    cl.use("dictation").then((raw) => wireDictation(raw ? {
+      start: () => raw.start(lang === "hi" ? { language: "hi" } : undefined),
+      stop: () => raw.stop(),
+      onPartial: (f) => raw.onPartial(f), onFinal: (f) => raw.onFinal(f), onState: (f) => raw.onState(f),
+    } : makeWebSpeech())).catch(() => wireDictation(makeWebSpeech()));
+  } else wireDictation(makeWebSpeech());
+  onLang(() => { setRecUI(listening ? "listening" : "idle"); if (dict == null || $("recBtn").disabled) { if ($("recBtn").disabled) noDictation(); } });
 
   $("pasteGo").onclick = () => {
-    const t = $("pasteText").value.trim(), secs = Number($("pasteSecs").value);
-    if (wordsOf(t).length < 15) { $("recStatus").textContent = "Paste at least a few sentences to score."; return; }
-    if (!(secs >= 5)) { $("recStatus").textContent = "Enter how many seconds you spoke."; return; }
-    liveText = t;
-    lastLive = analyzeText(t, secs, currentScript());
-    $("transcript").innerHTML = highlight(t);
+    const txt = $("pasteText").value.trim(), secs = Number($("pasteSecs").value);
+    if (wordsOf(txt).length < 15) { $("recStatus").textContent = t("Paste at least a few sentences to score."); return; }
+    if (!(secs >= 5)) { $("recStatus").textContent = t("Enter how many seconds you spoke."); return; }
+    liveText = txt;
+    lastLive = analyzeText(txt, secs, currentScript());
+    $("transcript").innerHTML = highlight(txt);
     $("timer").textContent = fmtTime(secs);
     renderLive(lastLive, false);
-    saveHistory({ mode: modeLabel(lastLive) || "Pasted", score: lastLive.overall, wpm: lastLive.wpm, fpm: lastLive.fpm, extra: lastLive.n + " words" });
-    $("recStatus").textContent = "Scored from your pasted transcript.";
+    saveHistory({ mode: modeLabel(lastLive) || "Pasted", lang, score: lastLive.overall, wpm: lastLive.wpm, fpm: lastLive.fpm, words: lastLive.n });
+    $("recStatus").textContent = t("Scored from your pasted transcript.");
     $("coachOut").innerHTML = "";
   };
 
-  // ---------- coaching prompt to paste into any AI chat ----------
+  // ---------- coaching: Claude inside claude.ai, otherwise a prompt to paste into any AI chat ----------
+  let sample = null;
+  function renderCoachIntro() {
+    $("coachBtn").textContent = sample ? t("Get coaching") : t("Copy coaching prompt");
+    $("coachNote").textContent = sample
+      ? t("Claude reads your transcript and gives you specific fixes, a stronger opening line and a drill for tomorrow.")
+      : t("Copies your transcript and scores as a ready-made prompt. Paste it into Claude or any AI chat to get specific fixes and a drill for tomorrow.");
+  }
+  if (cl && cl.use) cl.use("sample").then((s) => { sample = s; renderCoachIntro(); }).catch(() => {});
+  onLang(renderCoachIntro);
   function mdLite(s) {
     const lines = esc(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").split("\n");
     let out = "", inList = false;
@@ -1094,24 +1224,41 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
     });
     return out + (inList ? "</ul>" : "");
   }
+  function coachPrompt(r) {
+    const stats = `Pace: ${r.wpm} words per minute (target 130-160). Filler words: ${r.fpm.toFixed(1)} per minute. Average sentence length: ${r.avgSent ? Math.round(r.avgSent) + " words" : "unknown"}. Duration: ${Math.round(r.seconds)} seconds.`;
+    const language = lang === "hi"
+      ? "\n\nThe speaker practised in Hindi. Write your entire reply in simple, natural Hindi (Devanagari script), with the section headings in Hindi too. Quote their words exactly as given."
+      : "";
+    return (r.align
+      ? `You are a warm but direct speaking coach. Someone read this passage aloud (/ marks a planned pause, *word* marks stress):\n"""${r.script}"""\n\nSpeech-to-text heard:\n"""${r.text}"""\n\nMeasured stats: ${stats} Reading accuracy: ${r.accuracy}%. Words skipped or not heard clearly: ${[...new Set(r.align.missedWords)].join(", ") || "none"}.\n\nReply in plain markdown, under 220 words, with exactly these sections:\n## What worked\n- 2 short bullets\n## Fix next\n- 3 bullets on pace, clarity of specific words they dropped, and where to pause or stress\n## Try this line again\nPick one sentence from the passage they should re-read, and say exactly how to deliver it.\n## Drill for tomorrow\nOne specific 60-second practice drill.`
+      : `You are a warm but direct speaking coach. The text below is a speech-to-text transcript of someone answering this prompt out loud: "${$("promptText").textContent}". Punctuation is approximate and sounds like "um" may be missing.\n\nMeasured stats: ${stats}\n\nTranscript:\n"""${r.text}"""\n\nReply in plain markdown, under 250 words, with exactly these sections:\n## What worked\n- 2 short bullets\n## Fix next\n- 3 bullets; each quotes a short phrase they actually said and shows a better way to say it\n## Stronger opening\nOne rewritten opening of 1-2 sentences they could say instead.\n## Drill for tomorrow\nOne specific 60-second practice drill.`) + language;
+  }
   $("coachBtn").onclick = async () => {
     const r = lastLive;
-    if (!r) { $("coachOut").innerHTML = "<p>Record or paste your own session first, then ask for coaching.</p>"; return; }
-    const stats = `Pace: ${r.wpm} words per minute (target 130-160). Filler words: ${r.fpm.toFixed(1)} per minute. Average sentence length: ${r.avgSent ? Math.round(r.avgSent) + " words" : "unknown"}. Duration: ${Math.round(r.seconds)} seconds.`;
-    const input = r.align
-      ? `You are a warm but direct speaking coach. Someone read this passage aloud (/ marks a planned pause, *word* marks stress):\n"""${r.script}"""\n\nSpeech-to-text heard:\n"""${r.text}"""\n\nMeasured stats: ${stats} Reading accuracy: ${r.accuracy}%. Words skipped or not heard clearly: ${[...new Set(r.align.missedWords)].join(", ") || "none"}.\n\nReply in plain markdown, under 220 words, with exactly these sections:\n## What worked\n- 2 short bullets\n## Fix next\n- 3 bullets on pace, clarity of specific words they dropped, and where to pause or stress\n## Try this line again\nPick one sentence from the passage they should re-read, and say exactly how to deliver it.\n## Drill for tomorrow\nOne specific 60-second practice drill.`
-      : `You are a warm but direct speaking coach. The text below is a speech-to-text transcript of someone answering this prompt out loud: "${$("promptText").textContent}". Punctuation is approximate and sounds like "um" may be missing.\n\nMeasured stats: ${stats}\n\nTranscript:\n"""${r.text}"""\n\nReply in plain markdown, under 250 words, with exactly these sections:\n## What worked\n- 2 short bullets\n## Fix next\n- 3 bullets; each quotes a short phrase they actually said and shows a better way to say it\n## Stronger opening\nOne rewritten opening of 1-2 sentences they could say instead.\n## Drill for tomorrow\nOne specific 60-second practice drill.`;
+    if (!r) { $("coachOut").innerHTML = `<p>${t("Record or paste your own session first, then ask for coaching.")}</p>`; return; }
+    const input = coachPrompt(r);
+    if (sample) {
+      $("coachBtn").disabled = true;
+      $("coachOut").innerHTML = `<p class="note">${t("Thinking...")}</p>`;
+      try {
+        const { text } = await sample(input, { onText: ({ text }) => { $("coachOut").innerHTML = mdLite(text); } });
+        $("coachOut").innerHTML = mdLite(text);
+      } catch (e) {
+        $("coachOut").innerHTML = "<p>" + (e.code === "not_granted" ? t("Coaching needs permission to ask Claude. You can allow it from this page's Permissions menu.") : e.code === "rate_limited" ? t("Too many requests right now. Try again in a minute.") : t("Couldn't get coaching this time. Try again.")) + "</p>";
+      } finally { $("coachBtn").disabled = false; }
+      return;
+    }
     try {
       await navigator.clipboard.writeText(input);
-      $("coachOut").innerHTML = "<p><b>Copied.</b> Paste it into <a href=\"https://claude.ai/new\" target=\"_blank\" rel=\"noopener\">Claude</a> or any AI chat.</p>";
+      $("coachOut").innerHTML = `<p>${t("<b>Copied.</b> Paste it into <a href=\"https://claude.ai/new\" target=\"_blank\" rel=\"noopener\">Claude</a> or any AI chat.")}</p>`;
     } catch (e) {
-      $("coachOut").innerHTML = "<p class='note'>Your browser blocked copying. Select the text below and copy it yourself.</p><textarea readonly id=\"coachText\"></textarea>";
+      $("coachOut").innerHTML = `<p class="note">${t("Your browser blocked copying. Select the text below and copy it yourself.")}</p><textarea readonly id="coachText"></textarea>`;
       $("coachText").value = input; $("coachText").select();
     }
   };
 
   // ---------- recording analysis ----------
-  const charts = [];
+  const charts = [], audioViews = [];
   const drop = $("drop");
   ["dragenter", "dragover"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("over"); }));
   ["dragleave", "drop"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
@@ -1152,7 +1299,7 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
     const mask = new Uint8Array(nF); for (let i = 0; i < nF; i++) mask[i] = db[i] > thr ? 1 : 0;
     const runs = (val, maxLen, set) => { let i = 0; while (i < nF) { if (mask[i] === val) { let j = i; while (j < nF && mask[j] === val) j++; if (j - i < maxLen && i > 0 && j < nF) for (let k = i; k < j; k++) mask[k] = set; i = j; } else i++; } };
     runs(0, 15, 1); runs(1, 8, 0);
-    let first = mask.indexOf(1), last = mask.lastIndexOf(1);
+    const first = mask.indexOf(1), last = mask.lastIndexOf(1);
     if (first < 0 || last - first < 300) throw new Error("short");
 
     // pitch (normalized autocorrelation) on speech frames
@@ -1217,9 +1364,14 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
       }
       peaks.push(k);
     }
-    const wpm = Math.round(peaks.length / 1.45 / mins);
+    // Average syllables per word: about 1.45 in English, about 2 in Hindi.
+    const wpm = Math.round(peaks.length / (lang === "hi" ? 2 : 1.45) / mins);
+    return { wpm, pitchRange, med, pauses, pausesPm, longPauses, mins, spanSec, speechSec, volStd, trail, db, f0, mask, first, last, floor, peak, thr, nF };
+  }
 
-    // scores
+  // Scores and wording are built at render time so they follow the current language.
+  function audioMetrics(r) {
+    const { wpm, pitchRange, med, pauses, pausesPm, longPauses, mins, volStd, trail } = r;
     const paceS = bandScore(wpm, 130, 160, 2);
     const pitchS = pitchRange == null ? null : bandScore(pitchRange, 5, 14, 20);
     const pauseS = Math.round((bandScore(pausesPm, 6, 20, 6) + clamp(100 - Math.max(0, longPauses / mins - 1) * 30, 0, 100)) / 2);
@@ -1228,56 +1380,64 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
     const parts = [[paceS, 25], [pitchS, 25], [pauseS, 20], [volS, 15], [trailS, 15]].filter(([s]) => s != null);
     const overall = Math.round(parts.reduce((a, [s, w]) => a + s * w, 0) / parts.reduce((a, [, w]) => a + w, 0));
     const r1 = (v) => Math.round(v * 10) / 10;
-
     const metrics = [
-      { name: "Pace (estimated)", value: wpm, display: String(wpm), unit: "wpm", min: 60, max: 240, lo: 130, hi: 160, score: paceS,
-        chip: wpm > 160 ? (paceS >= 50 ? ["warn", "A bit fast"] : ["bad", "Too fast"]) : wpm < 130 ? (paceS >= 50 ? ["warn", "A bit slow"] : ["bad", "Too slow"]) : null,
-        tip: "Counted from syllables in the audio, so treat it as within about 15%. " + (wpm > 160 ? "Slow down and let key points land." : wpm < 130 ? "You can pick up the pace a little." : "A comfortable pace.") },
-      { name: "Pitch range", value: pitchRange == null ? null : r1(pitchRange), display: pitchRange == null ? "n/a" : r1(pitchRange).toFixed(1), unit: "semitones", min: 0, max: 20, lo: 5, hi: 14, score: pitchS ?? 0,
-        chip: pitchRange == null ? ["warn", "Unclear audio"] : pitchRange < 5 ? (pitchS >= 50 ? ["warn", "A bit flat"] : ["bad", "Monotone"]) : null,
-        tip: pitchRange == null ? "Couldn't track your pitch. Record closer to the mic in a quiet room." :
-             pitchRange < 5 ? `Your voice sits around ${Math.round(med)} Hz with little movement. Lift your pitch on the word that matters most in each sentence, and drop it at the end of a statement.` :
-             `Your voice moves around ${Math.round(med)} Hz with healthy variation, which keeps listeners engaged.` },
-      { name: "Pauses", value: Math.round(pausesPm), display: String(Math.round(pausesPm)), unit: "per min", min: 0, max: 40, lo: 6, hi: 20, score: pauseS,
-        tip: `${pauses.length} pauses of 0.3 s or more${longPauses ? `, ${longPauses} of them over 2 s` : ""}. ` +
-             (pausesPm < 6 ? "You rarely stop. Pause after each main point; it sounds confident and gives people time to think." :
-              longPauses / mins > 1 ? "Some long gaps. Plan your next point while you finish the current one." : "Good use of pauses.") },
-      { name: "Volume consistency", value: volStd == null ? null : r1(volStd), display: volStd == null ? "n/a" : r1(volStd).toFixed(1), unit: "dB spread", min: 0, max: 12, lo: 0, hi: 4, score: volS ?? 0,
-        chip: volStd == null ? ["warn", "Too short"] : null,
-        tip: volStd == null ? "Need a few more phrases to measure this." : volStd > 4 ? "Your volume swings between phrases. Keep your mouth the same distance from the mic and support each phrase with breath." : "Your energy stays even from phrase to phrase." },
-      { name: "Trailing off", value: trail == null ? null : r1(trail), display: trail == null ? "n/a" : r1(trail).toFixed(1), unit: "dB drop", min: -4, max: 12, lo: -4, hi: 3, score: trailS ?? 0,
-        chip: trail == null ? ["warn", "Too short"] : null,
-        tip: trail == null ? "Need longer phrases to measure this." : trail > 3 ? "You get quieter at the end of phrases. Keep your volume up through the last word, then breathe." : "You finish your phrases with steady volume." },
+      { name: t("Pace (estimated)"), value: wpm, display: String(wpm), unit: t("wpm"), min: 60, max: 240, lo: 130, hi: 160, score: paceS, chip: paceChip(wpm, paceS),
+        tip: t("Counted from syllables in the audio, so treat it as within about 15%.") + " " + (wpm > 160 ? t("Slow down and let key points land.") : wpm < 130 ? t("You can pick up the pace a little.") : t("A comfortable pace.")) },
+      { name: t("Pitch range"), value: pitchRange == null ? null : r1(pitchRange), display: pitchRange == null ? "–" : r1(pitchRange).toFixed(1), unit: t("semitones"), min: 0, max: 20, lo: 5, hi: 14, score: pitchS ?? 0,
+        chip: pitchRange == null ? ["warn", t("Unclear audio")] : pitchRange < 5 ? (pitchS >= 50 ? ["warn", t("A bit flat")] : ["bad", t("Monotone")]) : null,
+        tip: pitchRange == null ? t("Couldn't track your pitch. Record closer to the mic in a quiet room.") :
+             pitchRange < 5 ? t("Your voice sits around {hz} Hz with little movement. Lift your pitch on the word that matters most in each sentence, and drop it at the end of a statement.", { hz: Math.round(med) }) :
+             t("Your voice moves around {hz} Hz with healthy variation, which keeps listeners engaged.", { hz: Math.round(med) }) },
+      { name: t("Pauses"), value: Math.round(pausesPm), display: String(Math.round(pausesPm)), unit: t("per min"), min: 0, max: 40, lo: 6, hi: 20, score: pauseS,
+        tip: (longPauses ? t("{n} pauses of 0.3 s or more, {long} of them over 2 s.", { n: pauses.length, long: longPauses }) : t("{n} pauses of 0.3 s or more.", { n: pauses.length })) + " " +
+             (pausesPm < 6 ? t("You rarely stop. Pause after each main point; it sounds confident and gives people time to think.") :
+              longPauses / mins > 1 ? t("Some long gaps. Plan your next point while you finish the current one.") : t("Good use of pauses.")) },
+      { name: t("Volume consistency"), value: volStd == null ? null : r1(volStd), display: volStd == null ? "–" : r1(volStd).toFixed(1), unit: t("dB spread"), min: 0, max: 12, lo: 0, hi: 4, score: volS ?? 0,
+        chip: volStd == null ? ["warn", t("Too short")] : null,
+        tip: volStd == null ? t("Need a few more phrases to measure this.") : volStd > 4 ? t("Your volume swings between phrases. Keep your mouth the same distance from the mic and support each phrase with breath.") : t("Your energy stays even from phrase to phrase.") },
+      { name: t("Trailing off"), value: trail == null ? null : r1(trail), display: trail == null ? "–" : r1(trail).toFixed(1), unit: t("dB drop"), min: -4, max: 12, lo: -4, hi: 3, score: trailS ?? 0,
+        chip: trail == null ? ["warn", t("Too short")] : null,
+        tip: trail == null ? t("Need longer phrases to measure this.") : trail > 3 ? t("You get quieter at the end of phrases. Keep your volume up through the last word, then breathe.") : t("You finish your phrases with steady volume.") },
     ];
-    return { kind: "file", metrics, overall, wpm, pitchRange, med, pausesPm, longPauses, spanSec, speechSec, db, f0, mask, pauses, first, last, floor, peak, thr, nF };
+    return { metrics, overall };
   }
 
-  async function handleFile(file, box = $("fileResults"), name = file.name, fromLive = false) {
-    box.hidden = false;
-    box.innerHTML = `<p>Analyzing <b>${esc(name)}</b>...</p>`;
-    await new Promise((r) => setTimeout(r, 30));
-    let audio;
-    try { audio = await decodeMono(file); }
-    catch (e) { box.innerHTML = `<p>Couldn't read <b>${esc(name)}</b>. Save it as M4A, MP3 or WAV and try again.</p>`; return; }
-    let r;
-    try { r = analyzeAudio(audio); }
-    catch (e) { box.innerHTML = `<p>Not enough speech found in <b>${esc(name)}</b>. Record at least 10 seconds of talking, close to the mic.</p>`; return; }
-    const weakest = r.metrics.filter((m) => m.value != null).sort((a, b) => a.score - b.score)[0];
+  function renderAudio(view) {
+    const { box, r, name, fromLive } = view;
+    const { metrics, overall } = audioMetrics(r);
+    const weakest = metrics.filter((m) => m.value != null).sort((a, b) => a.score - b.score)[0];
     box.innerHTML = `
-      <div class="score-head">${ring(r.overall)}
-        <div class="sum"><span class="label">${fromLive ? "Your voice" : "Voice score"}</span><h2>${r.overall >= 80 ? "Confident, engaging delivery" : r.overall >= 60 ? "Good delivery, one thing to fix" : "Room to grow"}</h2>
-        <p>Biggest win next time: <b>${esc(weakest.name.toLowerCase())}</b>.</p>
-        <p class="note">${esc(name)} · ${fmtTime(r.spanSec)} of talking · you were speaking ${Math.round((r.speechSec / r.spanSec) * 100)}% of the time</p></div></div>
-      <div class="chart-wrap"><span class="label">Your recording</span><canvas></canvas>
-        <div class="legend"><span><i style="background:var(--accent);opacity:.55"></i>Loudness</span><span><i style="background:var(--ink)"></i>Pitch</span><span><i style="background:var(--line)"></i>Pause</span><span><i style="background:var(--warn);opacity:.5"></i>Long pause (2 s+)</span></div></div>
-      <div class="metrics">${r.metrics.map(metricRow).join("")}</div>`;
+      <div class="score-head">${ring(overall)}
+        <div class="sum"><span class="label">${fromLive ? t("Your voice") : t("Voice score")}</span><h2>${overall >= 80 ? t("Confident, engaging delivery") : overall >= 60 ? t("Good delivery, one thing to fix") : t("Room to grow")}</h2>
+        <p>${t("Biggest win next time:")} <b>${esc(weakest.name.toLowerCase())}</b></p>
+        <p class="note">${esc(name)} · ${t("{time} of talking · you were speaking {pct}% of the time", { time: fmtTime(r.spanSec), pct: Math.round((r.speechSec / r.spanSec) * 100) })}</p></div></div>
+      <div class="chart-wrap"><span class="label">${t("Your recording")}</span><canvas></canvas>
+        <div class="legend"><span><i style="background:var(--accent);opacity:.55"></i>${t("Loudness")}</span><span><i style="background:var(--ink)"></i>${t("Pitch")}</span><span><i style="background:var(--line)"></i>${t("Pause")}</span><span><i style="background:var(--warn);opacity:.5"></i>${t("Long pause (2 s+)")}</span></div></div>
+      <div class="metrics">${metrics.map(metricRow).join("")}</div>`;
     const cv = box.querySelector("canvas");
     charts.push([r, cv]);
     drawChart(r, cv);
+    return overall;
+  }
+  onLang(() => audioViews.forEach((v) => { if (v.box.isConnected) renderAudio(v); }));
+
+  async function handleFile(file, box = $("fileResults"), name = file.name, fromLive = false) {
+    box.hidden = false;
+    box.innerHTML = `<p>${t("Analyzing {name}...", { name: `<b>${esc(name)}</b>` })}</p>`;
+    await new Promise((res) => setTimeout(res, 30));
+    let audio;
+    try { audio = await decodeMono(file); }
+    catch (e) { box.innerHTML = `<p>${t("Couldn't read {name}. Save it as M4A, MP3 or WAV and try again.", { name: `<b>${esc(name)}</b>` })}</p>`; return; }
+    let r;
+    try { r = analyzeAudio(audio); }
+    catch (e) { box.innerHTML = `<p>${t("Not enough speech found in {name}. Record at least 10 seconds of talking, close to the mic.", { name: `<b>${esc(name)}</b>` })}</p>`; return; }
+    const view = { box, r, name, fromLive };
+    audioViews.push(view);
+    const overall = renderAudio(view);
     if (fromLive) {
       const h = loadHistory();
       if (h[0]) { h[0].pitch = r.pitchRange; try { localStorage.setItem(KEY, JSON.stringify(h)); } catch (e) {} renderHistory(h); }
-    } else saveHistory({ mode: "Recording", score: r.overall, wpm: r.wpm, pitch: r.pitchRange, extra: fmtTime(r.spanSec) });
+    } else saveHistory({ mode: "Recording", lang, score: overall, wpm: r.wpm, pitch: r.pitchRange, extra: fmtTime(r.spanSec) });
   }
 
   function drawChart(r, cv) {
@@ -1305,7 +1465,7 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
     // time axis
     g.fillStyle = col("--muted"); g.font = "11px " + col("--mono");
     const secs = n / 100, tickEvery = secs > 120 ? 30 : secs > 40 ? 10 : 5;
-    for (let t = 0; t <= secs; t += tickEvery) { const px = (t / secs) * W; g.fillText(fmtTime(t + a / 100), Math.min(px + 2, W - 30), H - 4); }
+    for (let s = 0; s <= secs; s += tickEvery) { const px = (s / secs) * W; g.fillText(fmtTime(s + a / 100), Math.min(px + 2, W - 30), H - 4); }
   }
   let rz; window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => charts.forEach(([r, cv]) => drawChart(r, cv)), 150); });
 
@@ -1317,22 +1477,25 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
     try { localStorage.setItem(KEY, JSON.stringify(h.slice(0, 50))); } catch (e) {}
     renderHistory(h);
   }
+  let confirmClear = false;
   function renderHistory(h = loadHistory()) {
-    $("clearHist").hidden = !h.length; $("clearHist").textContent = "Clear history"; confirmClear = false;
-    if (!h.length) { $("history").innerHTML = `<p class="note">Your scored sessions will appear here, newest first, so you can compare runs. They're kept in this browser only.</p>`; return; }
+    $("clearHist").hidden = !h.length; $("clearHist").textContent = t("Clear history"); confirmClear = false;
+    if (!h.length) { $("history").innerHTML = `<p class="note">${t("Your scored sessions will appear here, newest first, so you can compare runs. They're kept in this browser only.")}</p>`; return; }
     const best = Math.max(...h.map((e) => e.score));
-    $("history").innerHTML = `<div class="table-wrap"><table class="hist-table"><thead><tr><th>When</th><th>Type</th><th>Score</th><th>Pace</th><th>Fillers / min</th><th>Pitch range</th><th>Length</th></tr></thead><tbody>` +
-      h.slice(0, 15).map((e) => `<tr><td class="when" data-label="When">${new Date(e.t).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</td><td class="type" data-label="Type">${esc(e.mode)}</td>
-        <td class="num score" data-label="Score">${e.score}${e.score === best ? " ★" : ""}</td><td class="num" data-label="Pace">${e.wpm} wpm</td>
-        <td class="num" data-label="Fillers / min">${e.fpm != null ? e.fpm.toFixed(1) : "–"}</td><td class="num" data-label="Pitch range">${e.pitch != null ? e.pitch.toFixed(1) + " st" : "–"}</td><td class="num" data-label="Length">${esc(e.extra || "")}</td></tr>`).join("") +
+    const cols = [t("When"), t("Type"), t("Score"), t("Pace"), t("Fillers / min"), t("Pitch range"), t("Length")];
+    const length = (e) => (e.words != null ? t("{n} words", { n: e.words }) : (e.extra || "").replace(/^(\d+) words$/, (m, n) => t("{n} words", { n })));
+    $("history").innerHTML = `<div class="table-wrap"><table class="hist-table"><thead><tr>${cols.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>` +
+      h.slice(0, 15).map((e) => `<tr><td class="when" data-label="${esc(cols[0])}">${new Date(e.t).toLocaleString(lang === "hi" ? "hi-IN" : [], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</td><td class="type" data-label="${esc(cols[1])}">${esc(t(e.mode))}${e.lang === "hi" ? " · हिन्दी" : ""}</td>
+        <td class="num score" data-label="${esc(cols[2])}">${e.score}${e.score === best ? " ★" : ""}</td><td class="num" data-label="${esc(cols[3])}">${e.wpm} ${esc(t("wpm"))}</td>
+        <td class="num" data-label="${esc(cols[4])}">${e.fpm != null ? e.fpm.toFixed(1) : "–"}</td><td class="num" data-label="${esc(cols[5])}">${e.pitch != null ? e.pitch.toFixed(1) + " st" : "–"}</td><td class="num" data-label="${esc(cols[6])}">${esc(length(e))}</td></tr>`).join("") +
       `</tbody></table></div>`;
   }
-  let confirmClear = false;
   $("clearHist").onclick = () => {
-    if (!confirmClear) { confirmClear = true; $("clearHist").textContent = "Click again to clear"; return; }
+    if (!confirmClear) { confirmClear = true; $("clearHist").textContent = t("Click again to clear"); return; }
     try { localStorage.removeItem(KEY); } catch (e) {}
     renderHistory([]);
   };
+  onLang(() => renderHistory());
 
   // ---------- daily drills (no AI) ----------
   const DRILLS = [["breathe", "Breathe low and slow"], ["twister", "Warm up your mouth"], ["pace", "Pace trainer"], ["stress", "Stress changes meaning"], ["minute", "One minute, no fillers"], ["range", "Stretch your pitch"]];
@@ -1349,70 +1512,93 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
   }
   function renderRoutine() {
     const o = loadDrills(), today = (o.days || {})[dayKey()] || [];
-    $("routine").innerHTML = DRILLS.map(([id, name], i) => `<li><button data-go="${id}" class="${today.includes(id) ? "is-done" : ""}"><span class="tick">${today.includes(id) ? "✓" : ""}</span><span>${i + 1}. ${name}</span></button></li>`).join("");
-    $("drillSummary").textContent = today.length === 6 ? "All 6 done today. Nice work." : `${today.length} of 6 done`;
+    $("routine").innerHTML = DRILLS.map(([id, name], i) => `<li><button data-go="${id}" class="${today.includes(id) ? "is-done" : ""}"><span class="tick">${today.includes(id) ? "✓" : ""}</span><span>${i + 1}. ${esc(t(name))}</span></button></li>`).join("");
+    $("drillSummary").textContent = today.length === 6 ? t("All 6 done today. Nice work.") : t("{n} of 6 done", { n: today.length });
     $("streakNum").textContent = streakOf(o);
-    document.querySelectorAll(".done-btn").forEach((b) => { const on = today.includes(b.dataset.drill); b.setAttribute("aria-pressed", on); b.textContent = on ? "Done ✓" : "Mark done"; });
+    document.querySelectorAll(".done-btn").forEach((b) => { const on = today.includes(b.dataset.drill); b.setAttribute("aria-pressed", on); b.textContent = on ? t("Done ✓") : t("Mark done"); });
   }
   function toggleDrill(id) {
     const o = loadDrills(); o.days = o.days || {};
-    const k = dayKey(), t = o.days[k] || [];
-    o.days[k] = t.includes(id) ? t.filter((x) => x !== id) : t.concat(id);
+    const k = dayKey(), td = o.days[k] || [];
+    o.days[k] = td.includes(id) ? td.filter((x) => x !== id) : td.concat(id);
     saveDrills(o); renderRoutine();
   }
   $("routine").addEventListener("click", (e) => { const b = e.target.closest("[data-go]"); if (b) $("d-" + b.dataset.go).scrollIntoView({ behavior: "smooth", block: "start" }); });
   document.querySelectorAll(".done-btn").forEach((b) => b.addEventListener("click", () => toggleDrill(b.dataset.drill)));
+  onLang(renderRoutine);
 
   // box breathing: 4 phases of 4 seconds, 8 rounds
   let breathTimer = null;
   const PHASES = [["Breathe in", 1], ["Hold", 1], ["Breathe out", 0.45], ["Hold", 0.45]];
-  function stopBreath(msg) { clearInterval(breathTimer); breathTimer = null; $("breathBtn").textContent = "Start breathing"; $("breathPhase").textContent = msg || "Ready"; $("breathCount").textContent = "4"; $("breathDot").style.transform = "scale(.45)"; }
+  function stopBreath(msg) {
+    clearInterval(breathTimer); breathTimer = null;
+    $("breathBtn").textContent = t("Start breathing"); $("breathPhase").textContent = msg || t("Ready"); $("breathCount").textContent = "4"; $("breathDot").style.transform = "scale(.45)";
+  }
+  const breathIntro = () => { stopBreath(); $("breathLeft").textContent = t("8 rounds of breathe in 4, hold 4, out 4, hold 4."); };
   $("breathBtn").onclick = () => {
     if (breathTimer) return stopBreath();
     let sec = 0; const total = 8 * 16;
-    $("breathBtn").textContent = "Stop";
+    $("breathBtn").textContent = t("Stop");
     const tickB = () => {
-      if (sec >= total) { stopBreath("Done"); $("breathLeft").textContent = "Nice. Your voice is ready."; return; }
+      if (sec >= total) { stopBreath(t("Done")); $("breathLeft").textContent = t("Nice. Your voice is ready."); return; }
       const [name, scale] = PHASES[Math.floor(sec / 4) % 4];
-      $("breathPhase").textContent = name; $("breathCount").textContent = 4 - (sec % 4);
+      $("breathPhase").textContent = t(name); $("breathCount").textContent = 4 - (sec % 4);
       if (sec % 4 === 0) $("breathDot").style.transform = `scale(${scale})`;
-      $("breathLeft").textContent = `Round ${Math.floor(sec / 16) + 1} of 8`;
+      $("breathLeft").textContent = t("Round {n} of 8", { n: Math.floor(sec / 16) + 1 });
       sec++;
     };
     tickB(); breathTimer = setInterval(tickB, 1000);
   };
+  onLang(breathIntro);
 
   // tongue twisters
-  const TWISTERS = [
-    "Red leather, yellow leather.",
-    "Unique New York, unique New York, you know you need unique New York.",
-    "She sells seashells by the seashore.",
-    "Peter Piper picked a peck of pickled peppers.",
-    "Truly rural, truly rural, truly rural.",
-    "Six slippery snails slid slowly seaward.",
-    "Big black bug bit a big black bear.",
-    "Toy boat, toy boat, toy boat.",
-    "The lips, the teeth, the tip of the tongue.",
-    "Good blood, bad blood, good blood, bad blood.",
-    "Which witch wished which wicked wish?",
-    "Fresh French fried fly fritters.",
-  ];
+  const TWISTERS = {
+    en: [
+      "Red leather, yellow leather.",
+      "Unique New York, unique New York, you know you need unique New York.",
+      "She sells seashells by the seashore.",
+      "Peter Piper picked a peck of pickled peppers.",
+      "Truly rural, truly rural, truly rural.",
+      "Six slippery snails slid slowly seaward.",
+      "Big black bug bit a big black bear.",
+      "Toy boat, toy boat, toy boat.",
+      "The lips, the teeth, the tip of the tongue.",
+      "Good blood, bad blood, good blood, bad blood.",
+      "Which witch wished which wicked wish?",
+      "Fresh French fried fly fritters.",
+    ],
+    hi: [
+      "कच्चा पापड़, पक्का पापड़।",
+      "चंदू के चाचा ने चंदू की चाची को चाँदनी रात में चाँदी के चम्मच से चटनी चटाई।",
+      "समझ समझ के समझ को समझो, समझ समझना भी एक समझ है।",
+      "पीतल के पतीले में पपीता पीला पीला।",
+      "खड़क सिंह के खड़कने से खड़कती हैं खिड़कियाँ।",
+      "पके पेड़ पर पका पपीता, पका पेड़ या पका पपीता।",
+      "कच्चे काजू, पक्के काजू, कच्चे पक्के काजू।",
+      "लाल पीली लाल पीली लाल पीली।",
+      "ऊँट ऊँचा, ऊँट की पीठ ऊँची, ऊँची पूँछ ऊँट की।",
+      "कालू काका ने काली कोयल को काले कौवे से कम कहा।",
+      "तोता टीटू तीन तरह की टॉफ़ी तोड़ता।",
+      "नदी किनारे नीम नया, नीम तले नन्ही नैया।",
+    ],
+  };
   let twIdx = 0;
-  const showTwister = () => { $("twister").textContent = TWISTERS[twIdx]; $("twisterPos").textContent = `${twIdx + 1} / ${TWISTERS.length}`; };
-  $("twisterNext").onclick = () => { twIdx = (twIdx + 1) % TWISTERS.length; showTwister(); };
+  const showTwister = () => { const list = TWISTERS[lang]; twIdx %= list.length; $("twister").textContent = list[twIdx]; $("twisterPos").textContent = `${twIdx + 1} / ${list.length}`; };
+  $("twisterNext").onclick = () => { twIdx = (twIdx + 1) % TWISTERS[lang].length; showTwister(); };
+  onLang(showTwister);
 
   // pace trainer: highlights one word at a time at the chosen speed, with a short hold at each "/"
   let paceIdx = nextIdx(-1, "All", "pace"), paceTimer = null;
   function paceRender() {
     $("paceText").classList.remove("running");
-    $("paceText").innerHTML = PASSAGES[paceIdx][1].split(/\s+/).map((t) => t === "/" ? '<span class="pause-mark">/</span>' : `<span class="pw">${esc(t).replace(/\*(.+?)\*/g, "<strong>$1</strong>")}</span>`).join(" ");
+    $("paceText").innerHTML = PASSAGES[paceIdx][1].split(/\s+/).map((w) => w === "/" ? '<span class="pause-mark">/</span>' : `<span class="pw">${esc(w).replace(/\*(.+?)\*/g, "<strong>$1</strong>")}</span>`).join(" ");
   }
-  function paceStop() { clearTimeout(paceTimer); paceTimer = null; $("paceBtn").textContent = "Start"; }
+  function paceStop() { clearTimeout(paceTimer); paceTimer = null; $("paceBtn").textContent = t("Start"); }
   $("paceBtn").onclick = () => {
     if (paceTimer) { paceStop(); return; }
     paceRender();
     const box = $("paceText"), nodes = [...box.children], ms = 60000 / Number($("paceWpm").value);
-    box.classList.add("running"); $("paceBtn").textContent = "Stop";
+    box.classList.add("running"); $("paceBtn").textContent = t("Stop");
     let i = 0;
     const step = () => {
       box.querySelectorAll(".now").forEach((n) => { n.classList.remove("now"); n.classList.add("read"); });
@@ -1427,73 +1613,95 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
     step();
   };
   $("paceNext").onclick = () => { paceStop(); paceIdx = nextIdx(paceIdx, "All", "pace"); paceRender(); };
+  onLang(() => { paceStop(); paceIdx = nextIdx(-1, "All", "pace"); paceRender(); });
 
   // one minute, no fillers
-  const TOPICS = ["Your favourite place to eat, and why.", "The best advice anyone ever gave you.", "How you would spend a free Saturday.", "A skill you'd love to learn this year.", "What makes a good manager.", "A movie or show everyone should watch.", "The hardest part of your job.", "Your morning routine.", "A city you'd love to live in.", "Something you changed your mind about.", "How to make a good first impression.", "Why people should read more."];
+  const TOPICS = {
+    en: ["Your favourite place to eat, and why.", "The best advice anyone ever gave you.", "How you would spend a free Saturday.", "A skill you'd love to learn this year.", "What makes a good manager.", "A movie or show everyone should watch.", "The hardest part of your job.", "Your morning routine.", "A city you'd love to live in.", "Something you changed your mind about.", "How to make a good first impression.", "Why people should read more."],
+    hi: ["आपकी पसंदीदा खाने की जगह, और क्यों।", "किसी की दी हुई सबसे अच्छी सलाह।", "खाली शनिवार को आप कैसे बिताएँगे।", "इस साल आप कौन सा हुनर सीखना चाहेंगे।", "एक अच्छा मैनेजर कैसा होता है।", "एक फ़िल्म जो हर किसी को देखनी चाहिए।", "आपके काम का सबसे मुश्किल हिस्सा।", "आपकी सुबह की दिनचर्या।", "वह शहर जहाँ आप रहना चाहेंगे।", "कोई बात जिस पर आपकी राय बदल गई।", "अच्छी पहली छाप कैसे छोड़ें।", "लोगों को ज़्यादा क्यों पढ़ना चाहिए।"],
+  };
   let topicIdx = 0, minuteTimer = null, minuteLeft = 60, tally = 0;
   const FKEY = "speaking-coach.fillerBest";
-  $("minuteTopic").textContent = TOPICS[0];
-  $("minuteTopicBtn").onclick = () => { topicIdx = (topicIdx + 1) % TOPICS.length; $("minuteTopic").textContent = TOPICS[topicIdx]; };
+  const showTopic = () => { $("minuteTopic").textContent = TOPICS[lang][topicIdx % TOPICS[lang].length]; };
+  $("minuteTopicBtn").onclick = () => { topicIdx = (topicIdx + 1) % TOPICS[lang].length; showTopic(); };
   function bestFillers() { try { const v = localStorage.getItem(FKEY); return v == null ? null : Number(v); } catch (e) { return null; } }
-  function showBest() { const b = bestFillers(); if (b != null) $("minuteResult").textContent = `Your best: ${b} filler${b === 1 ? "" : "s"} in a minute.`; }
+  function showBest() { const b = bestFillers(); $("minuteResult").textContent = b != null ? t("Your best: {n} fillers in a minute.", { n: b }) : t("Your best so far appears here."); }
   function endMinute(finished) {
     clearInterval(minuteTimer); minuteTimer = null;
-    $("tallyBtn").disabled = true; $("minuteBtn").textContent = "Start 60 seconds"; $("minuteClock").textContent = "1:00";
+    $("tallyBtn").disabled = true; $("minuteBtn").textContent = t("Start 60 seconds"); $("minuteClock").textContent = "1:00";
     if (!finished) return;
     const best = bestFillers();
-    let msg = `${tally} filler${tally === 1 ? "" : "s"} this round.`;
-    if (best == null || tally < best) { try { localStorage.setItem(FKEY, tally); } catch (e) {} msg += best == null ? " That's your first score; beat it tomorrow." : ` New best, down from ${best}.`; }
-    else msg += ` Your best is ${best}.`;
+    let msg = t("{n} fillers this round.", { n: tally });
+    if (best == null || tally < best) { try { localStorage.setItem(FKEY, tally); } catch (e) {} msg += " " + (best == null ? t("That's your first score; beat it tomorrow.") : t("New best, down from {n}.", { n: best })); }
+    else msg += " " + t("Your best is {n}.", { n: best });
     $("minuteResult").textContent = msg;
   }
   $("minuteBtn").onclick = () => {
     if (minuteTimer) return endMinute(false);
     tally = 0; minuteLeft = 60; $("tallyNum").textContent = "0";
-    $("tallyBtn").disabled = false; $("minuteBtn").textContent = "Stop";
+    $("tallyBtn").disabled = false; $("minuteBtn").textContent = t("Stop");
     minuteTimer = setInterval(() => { minuteLeft--; $("minuteClock").textContent = fmtTime(minuteLeft); if (minuteLeft <= 0) endMinute(true); }, 1000);
   };
   $("tallyBtn").onclick = () => { tally++; $("tallyNum").textContent = tally; };
-
-  showTwister(); paceRender(); showBest(); renderRoutine();
+  onLang(() => { endMinute(false); showTopic(); showBest(); });
 
   // ---------- voice exercises: countdown timers and breath-test stopwatches ----------
+  const timerStops = [];
   document.querySelectorAll(".timer-btn").forEach((b) => {
-    const label = b.textContent; let t = null;
+    const label = b.textContent.trim(); let tm = null;
+    const reset = () => { clearInterval(tm); tm = null; b.classList.remove("running"); b.textContent = t(label); };
+    timerStops.push(reset);
     b.addEventListener("click", () => {
-      if (t) { clearInterval(t); t = null; b.classList.remove("running"); b.textContent = label; return; }
+      if (tm) return reset();
       let left = Number(b.dataset.secs);
-      b.classList.add("running"); b.textContent = fmtTime(left) + " · Stop";
-      t = setInterval(() => {
+      b.classList.add("running"); b.textContent = fmtTime(left) + " · " + t("Stop");
+      tm = setInterval(() => {
         left--;
-        if (left <= 0) { clearInterval(t); t = null; b.classList.remove("running"); b.textContent = "Done ✓"; setTimeout(() => { if (!t) b.textContent = label; }, 3000); return; }
-        b.textContent = fmtTime(left) + " · Stop";
+        if (left <= 0) { clearInterval(tm); tm = null; b.classList.remove("running"); b.textContent = t("Done ✓"); setTimeout(() => { if (!tm) b.textContent = t(label); }, 3000); return; }
+        b.textContent = fmtTime(left) + " · " + t("Stop");
       }, 1000);
     });
   });
   document.querySelectorAll(".stopwatch").forEach((sw) => {
     const key = "speaking-coach.best." + sw.dataset.key, timeEl = sw.querySelector(".sw-time"), btn = sw.querySelector(".sw-btn"), bestEl = sw.querySelector(".sw-best");
-    const goal = bestEl.textContent;
+    const goal = bestEl.textContent.trim();
     let start = 0, raf = null;
     const getBest = () => { try { const v = localStorage.getItem(key); return v == null ? null : Number(v); } catch (e) { return null; } };
-    const showBest = (extra) => { const b = getBest(); bestEl.textContent = (extra ? extra + " " : "") + (b != null ? `Your best: ${b.toFixed(1)} s. ` : "") + goal; };
+    const showSwBest = (extra) => { const b = getBest(); bestEl.textContent = (extra ? extra + " " : "") + (b != null ? t("Your best: {s} s.", { s: b.toFixed(1) }) + " " : "") + t(goal); };
     const frame = () => { timeEl.textContent = ((performance.now() - start) / 1000).toFixed(1) + " s"; raf = requestAnimationFrame(frame); };
+    const reset = () => { if (raf) { cancelAnimationFrame(raf); raf = null; sw.classList.remove("running"); timeEl.textContent = "0.0 s"; } btn.textContent = t("Start"); showSwBest(); };
+    timerStops.push(reset);
     btn.addEventListener("click", () => {
-      if (!raf) { start = performance.now(); sw.classList.add("running"); btn.textContent = "Stop"; frame(); return; }
-      cancelAnimationFrame(raf); raf = null; sw.classList.remove("running"); btn.textContent = "Try again";
+      if (!raf) { start = performance.now(); sw.classList.add("running"); btn.textContent = t("Stop"); frame(); return; }
+      cancelAnimationFrame(raf); raf = null; sw.classList.remove("running"); btn.textContent = t("Try again");
       const secs = (performance.now() - start) / 1000, best = getBest();
       timeEl.textContent = secs.toFixed(1) + " s";
-      if (secs >= 2 && (best == null || secs > best)) { try { localStorage.setItem(key, secs.toFixed(1)); } catch (e) {} showBest(best == null ? "First score saved." : "New best!"); }
-      else showBest();
+      if (secs >= 2 && (best == null || secs > best)) { try { localStorage.setItem(key, secs.toFixed(1)); } catch (e) {} showSwBest(best == null ? t("First score saved.") : t("New best!")); }
+      else showSwBest();
     });
-    showBest();
   });
+  onLang(() => timerStops.forEach((f) => f()));
+
+  // Switching language stops anything running so no label is left half-translated.
+  function stopEverything() {
+    if (listening && dict) dict.stop().catch(() => {});
+    if (breathTimer) stopBreath();
+    if (paceTimer) paceStop();
+    if (minuteTimer) endMinute(false);
+  }
 
   // ---------- initial example state ----------
-  const EXAMPLE = "So I work on the marketing team, and basically my job is to help loan officers, um, find new clients. We write emails and social posts that they can share with their network. It matters because, you know, most people only talk to one lender before they buy a home, and they actually end up paying more than they need to. So if we can, like, put better information in front of them earlier, they make a better decision. And for the loan officer it means they get more referrals without having to cold call. I think the part I enjoy most is seeing which emails actually work, and then doing more of that.";
-  renderPassage();
-  setMode("read");
-  renderLive(analyzeText(EXAMPLE, 44), true);
-  renderHistory();
+  const EXAMPLE = {
+    en: "So I work on the marketing team, and basically my job is to help loan officers, um, find new clients. We write emails and social posts that they can share with their network. It matters because, you know, most people only talk to one lender before they buy a home, and they actually end up paying more than they need to. So if we can, like, put better information in front of them earlier, they make a better decision. And for the loan officer it means they get more referrals without having to cold call. I think the part I enjoy most is seeing which emails actually work, and then doing more of that.",
+    hi: "तो मैं मार्केटिंग टीम में काम करता हूँ, और मतलब मेरा काम है लोन अफ़सरों को नए ग्राहक ढूँढने में मदद करना। हम ईमेल और पोस्ट लिखते हैं जो वे अपने जान पहचान वालों के साथ बाँट सकते हैं। यह ज़रूरी है क्योंकि, है ना, ज़्यादातर लोग घर खरीदने से पहले सिर्फ़ एक ही बैंक से बात करते हैं, और फिर उन्हें ज़रूरत से ज़्यादा पैसे देने पड़ते हैं। तो अगर हम उन्हें पहले से अच्छी जानकारी दे सकें, यानी सही समय पर, तो वे बेहतर फ़ैसला लेते हैं। और लोन अफ़सर को बिना ठंडे फ़ोन किए ज़्यादा ग्राहक मिलते हैं। मुझे सबसे अच्छा यह लगता है कि कौन से ईमेल सच में काम करते हैं, यह देखना और फिर वही और करना।",
+  };
+  onLang(() => {
+    if (lastLive && !liveIsExample) { lastLive = analyzeText(lastLive.text, lastLive.seconds, lastLive.script); renderLive(lastLive, false); }
+    else renderLive(analyzeText(EXAMPLE[lang], lang === "hi" ? 52 : 44), true);
+  });
+
+  applyStatic();
+  refreshers.forEach((f) => f());
 })();
 </script>
 </body>
