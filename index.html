@@ -438,7 +438,19 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
     ["Clear speech drill", "Red leather, yellow leather. / Clear, crisp consonants make *every* word count. / She sells seashells by the seashore, / and the shells she sells are *surely* seashells. / Practice speaking from your chest, / not your throat. / Open your mouth a little *wider* than feels natural. / Finish the *final* sound of every word, / especially the t, the d, and the k. / Think of the last row of the room, / and send your voice *there*. / Slow down on the *long* words. / Do not rush the short ones either. / Now read this paragraph one more time, / a little *slower*, / and notice how much *stronger* you sound."],
     ["A quick pitch", "Every week, our team spends *hours* on the same report. / We copy numbers from four different tools, / paste them into a spreadsheet, / and fix the mistakes by hand. / I think we can get that time *back*. / Here is my idea. / We connect those four tools *once*, / and build a simple dashboard that updates on its own. / No copying, / no pasting, / and far fewer mistakes. / I have already built a rough version, / and it took me *one* afternoon. / If we spend two more weeks on it, / I believe we save at least *five* hours a week across the team. / That is more than *two hundred* hours a year. / I would love *ten* minutes on Friday / to show you how it works."],
   ];
-  let passageIdx = 0, mode = "read";
+  // Shuffle bag: every passage comes up once, in random order, before any repeats.
+  function makeBag(n) {
+    let bag = [];
+    return (cur) => {
+      if (!bag.length) {
+        bag = [...Array(n).keys()].filter((i) => i !== cur);
+        for (let i = bag.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [bag[i], bag[j]] = [bag[j], bag[i]]; }
+      }
+      return bag.pop();
+    };
+  }
+  const nextReadPassage = makeBag(PASSAGES.length);
+  let passageIdx = nextReadPassage(-1), mode = "read";
   const scriptText = () => PASSAGES[passageIdx][1];
   function renderPassage(missedSet) {
     let wi = 0;
@@ -453,7 +465,7 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
     $("passage").innerHTML = html;
     $("passageTitle").textContent = "Read this aloud · " + PASSAGES[passageIdx][0];
   }
-  $("nextPassage").onclick = () => { passageIdx = (passageIdx + 1) % PASSAGES.length; renderPassage(); };
+  $("nextPassage").onclick = () => { passageIdx = nextReadPassage(passageIdx); renderPassage(); };
   function setMode(m) {
     mode = m;
     $("modeRead").setAttribute("aria-pressed", m === "read"); $("modeTalk").setAttribute("aria-pressed", m === "talk");
@@ -1078,7 +1090,8 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
   $("twisterNext").onclick = () => { twIdx = (twIdx + 1) % TWISTERS.length; showTwister(); };
 
   // pace trainer: highlights one word at a time at the chosen speed, with a short hold at each "/"
-  let paceIdx = 0, paceTimer = null;
+  const nextPacePassage = makeBag(PASSAGES.length);
+  let paceIdx = nextPacePassage(-1), paceTimer = null;
   function paceRender() {
     $("paceText").classList.remove("running");
     $("paceText").innerHTML = PASSAGES[paceIdx][1].split(/\s+/).map((t) => t === "/" ? '<span class="pause-mark">/</span>' : `<span class="pw">${esc(t).replace(/\*(.+?)\*/g, "<strong>$1</strong>")}</span>`).join(" ");
@@ -1102,7 +1115,7 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
     };
     step();
   };
-  $("paceNext").onclick = () => { paceStop(); paceIdx = (paceIdx + 1) % PASSAGES.length; paceRender(); };
+  $("paceNext").onclick = () => { paceStop(); paceIdx = nextPacePassage(paceIdx); paceRender(); };
 
   // one minute, no fillers
   const TOPICS = ["Your favourite place to eat, and why.", "The best advice anyone ever gave you.", "How you would spend a free Saturday.", "A skill you'd love to learn this year.", "What makes a good manager.", "A movie or show everyone should watch.", "The hardest part of your job.", "Your morning routine.", "A city you'd love to live in.", "Something you changed your mind about.", "How to make a good first impression.", "Why people should read more."];
