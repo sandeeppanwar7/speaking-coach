@@ -211,6 +211,20 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
 .checklist { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px }
 .checklist > div { display: grid; gap: 8px; align-content: start; padding: 14px 16px; background: var(--bg); border-radius: 10px; min-width: 0 }
 .checklist ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 15px }
+/* Voice exercises */
+.routine-strip { display: grid; gap: 8px; padding: 14px 16px; background: var(--bg); border-radius: 10px }
+.routine-strip ol { margin: 0; padding-left: 20px; display: flex; flex-wrap: wrap; gap: 4px 28px }
+.care-note { font-size: 14px; color: var(--warn); border-left: 3px solid var(--warn); padding-left: 12px }
+.breath-tests { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px }
+.stopwatch { display: grid; gap: 8px; justify-items: start; padding: 16px; background: var(--bg); border-radius: 12px; min-width: 0 }
+.sw-time { font-size: 40px; font-weight: 700; color: var(--accent); line-height: 1.1 }
+.stopwatch.running .sw-time { color: var(--ink) }
+.ex-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px }
+.ex { display: grid; gap: 10px; align-content: start; padding: 16px; background: var(--bg); border-radius: 12px; min-width: 0 }
+.ex p { color: var(--muted); font-size: 15px }
+.ex ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 15px }
+.timer-btn { justify-self: start; font-variant-numeric: tabular-nums }
+.timer-btn.running { background: var(--accent); color: var(--accent-ink); border-color: var(--accent) }
 </style>
 </head>
 <body>
@@ -226,6 +240,7 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
     <button class="tab" role="tab" id="tab-file" aria-selected="false" aria-controls="panel-file">Analyze a recording</button>
     <button class="tab" role="tab" id="tab-drills" aria-selected="false" aria-controls="panel-drills">Daily drills</button>
     <button class="tab" role="tab" id="tab-tips" aria-selected="false" aria-controls="panel-tips">Best practices</button>
+    <button class="tab" role="tab" id="tab-voice" aria-selected="false" aria-controls="panel-voice">Voice exercises</button>
   </nav>
 
   <!-- LIVE -->
@@ -518,6 +533,150 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
     </div>
   </section>
 
+  <!-- VOICE EXERCISES -->
+  <section class="panel" id="panel-voice" role="tabpanel" aria-labelledby="tab-voice" hidden>
+    <div class="card">
+      <span class="label">Voice exercises</span>
+      <h2>Build a stronger, fuller voice</h2>
+      <p class="lede" style="margin-top:0">A powerful voice comes from breath, resonance and a relaxed throat, not from pushing harder. Do these for 5 to 10 minutes a day; most people hear a difference within two to three weeks.</p>
+      <div class="routine-strip">
+        <span class="label">Quick 5-minute warm-up</span>
+        <ol><li>Belly breathing</li><li>Lip trills</li><li>Humming</li><li>Ha-ha pulses</li><li>Counting to the wall</li></ol>
+      </div>
+      <p class="care-note">Stop if anything hurts or your voice gets hoarse. These should feel easy. If hoarseness lasts more than two weeks, see a doctor or speech therapist.</p>
+    </div>
+
+    <div class="card">
+      <h2>Test your breath control</h2>
+      <p class="note">Take a full belly breath, then hold the sound as long as you can at an even volume. Try it before and after a few weeks of practice.</p>
+      <div class="breath-tests">
+        <div class="stopwatch" data-key="hiss">
+          <h3>Steady "sss" hiss</h3>
+          <p class="note">Like a slow leak from a tyre. Keep it even, not loud.</p>
+          <span class="sw-time mono">0.0 s</span>
+          <button class="btn primary sw-btn">Start</button>
+          <p class="note sw-best">Aim for 20 s. Over 30 s is excellent.</p>
+        </div>
+        <div class="stopwatch" data-key="ah">
+          <h3>Sustained "ahh"</h3>
+          <p class="note">Comfortable pitch, steady volume, no wobble at the end.</p>
+          <span class="sw-time mono">0.0 s</span>
+          <button class="btn primary sw-btn">Start</button>
+          <p class="note sw-best">Aim for 15 s. Over 20 s is excellent.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <span class="label">1 · Breath support</span>
+      <div class="ex-grid">
+        <article class="ex">
+          <div class="drill-head"><h3>Belly breathing</h3><span class="mins">2 min</span></div>
+          <p>Breath is the fuel of your voice. Breathing low gives you power without strain.</p>
+          <ol><li>Put one hand on your chest and one on your belly.</li><li>Breathe in through your nose for four. Only the belly hand should move.</li><li>Breathe out slowly on "sss" for eight.</li><li>Repeat. Keep your shoulders down the whole time.</li></ol>
+          <button class="btn timer-btn" data-secs="120">Start 2:00 timer</button>
+        </article>
+        <article class="ex">
+          <div class="drill-head"><h3>Ha-ha pulses</h3><span class="mins">1 min</span></div>
+          <p>Teaches your belly muscles to push the sound out, so your throat doesn't have to.</p>
+          <ol><li>Hand on your belly, just below your ribs.</li><li>Say "ha! ha! ha!" in short, sharp bursts. Feel your belly kick in on each one.</li><li>Then try "Hey!", "Stop!", "Next!" with the same kick.</li><li>Keep your throat loose. The power comes from below.</li></ol>
+          <button class="btn timer-btn" data-secs="60">Start 1:00 timer</button>
+        </article>
+      </div>
+    </div>
+
+    <div class="card">
+      <span class="label">2 · Resonance</span>
+      <div class="ex-grid">
+        <article class="ex">
+          <div class="drill-head"><h3>Humming</h3><span class="mins">1 min</span></div>
+          <p>Resonance makes a voice sound full and warm instead of thin. Humming helps you find it.</p>
+          <ol><li>Lips lightly closed, teeth apart, hum "mmm" at a comfortable pitch.</li><li>Feel the buzz on your lips and nose. If you feel it in your throat, relax and hum softer.</li><li>Open into vowels: "mmm-ahh", "mmm-ohh", "mmm-eee".</li><li>Keep the buzz going into each vowel.</li></ol>
+          <button class="btn timer-btn" data-secs="60">Start 1:00 timer</button>
+        </article>
+        <article class="ex">
+          <div class="drill-head"><h3>Find your natural pitch</h3><span class="mins">1 min</span></div>
+          <p>Many people speak higher or lower than is natural for them, which tires the voice and sounds strained.</p>
+          <ol><li>Say "mm-hmm" as if you're casually agreeing with someone.</li><li>The pitch of the "hmm" is close to your natural speaking pitch.</li><li>Go straight into a sentence from it: "Mm-hmm, good morning, everyone."</li><li>Repeat a few times until it feels automatic.</li></ol>
+        </article>
+        <article class="ex">
+          <div class="drill-head"><h3>Chest voice</h3><span class="mins">1 min</span></div>
+          <p>A grounded, chest-resonant voice sounds calm and authoritative.</p>
+          <ol><li>Put your hand flat on your upper chest.</li><li>Say "one, two, three" slowly in a relaxed, slightly lower voice.</li><li>You should feel a gentle vibration under your hand.</li><li>Read one sentence from a passage keeping that vibration. Don't force your pitch down; just relax.</li></ol>
+        </article>
+      </div>
+    </div>
+
+    <div class="card">
+      <span class="label">3 · Projection</span>
+      <div class="ex-grid">
+        <article class="ex">
+          <div class="drill-head"><h3>Counting to the wall</h3><span class="mins">2 min</span></div>
+          <p>Being heard across a room comes from breath and focus, not shouting.</p>
+          <ol><li>Stand an arm's length from a wall and count one to ten in your normal voice.</li><li>Step back to the middle of the room and count again, aiming your voice at the wall.</li><li>Step back once more, to the far side of the room.</li><li>Each time, take a bigger belly breath. Your throat should feel the same at every distance.</li></ol>
+          <button class="btn timer-btn" data-secs="120">Start 2:00 timer</button>
+        </article>
+        <article class="ex">
+          <div class="drill-head"><h3>The calling voice</h3><span class="mins">1 min</span></div>
+          <p>The voice you'd use to call a friend across a park. It's loud but easy, because it's supported.</p>
+          <ol><li>Imagine a friend far away. Call "Hel-lo!" with a long, open vowel.</li><li>Try "Over here!" and "Good morning!" the same way.</li><li>Then say a normal sentence at half that volume, keeping the same open, forward feeling.</li></ol>
+        </article>
+      </div>
+    </div>
+
+    <div class="card">
+      <span class="label">4 · Warm-up and control</span>
+      <div class="ex-grid">
+        <article class="ex">
+          <div class="drill-head"><h3>Lip trills</h3><span class="mins">1 min</span></div>
+          <p>The gentlest warm-up there is. Singers and actors use it before every performance.</p>
+          <ol><li>Relax your lips and blow through them so they flutter, like a motorboat "brrr".</li><li>Add your voice and hold one steady pitch.</li><li>Slide slowly from low to high and back, like a siren.</li><li>If your lips won't flutter, press a fingertip into each cheek.</li></ol>
+          <button class="btn timer-btn" data-secs="60">Start 1:00 timer</button>
+        </article>
+        <article class="ex">
+          <div class="drill-head"><h3>Straw humming</h3><span class="mins">1 min</span></div>
+          <p>Humming through a straw balances air pressure on your vocal cords, so they warm up with almost no effort.</p>
+          <ol><li>Put a regular drinking straw between your lips.</li><li>Hum "ooo" through it at a comfortable pitch.</li><li>Slide up and down slowly, like a siren.</li><li>Then hum a simple tune you know.</li></ol>
+          <button class="btn timer-btn" data-secs="60">Start 1:00 timer</button>
+        </article>
+        <article class="ex">
+          <div class="drill-head"><h3>Pen-in-teeth reading</h3><span class="mins">2 min</span></div>
+          <p>Makes your tongue and lips work harder, so you speak more clearly when the pen comes out.</p>
+          <ol><li>Hold a clean pen sideways, lightly between your front teeth.</li><li>Read a passage aloud for one minute, trying to be as clear as possible.</li><li>Take the pen out and read the same passage again.</li><li>Notice how much crisper you sound.</li></ol>
+          <button class="btn timer-btn" data-secs="60">Start 1:00 timer</button>
+        </article>
+      </div>
+    </div>
+
+    <div class="card">
+      <span class="label">5 · Release tension</span>
+      <div class="ex-grid">
+        <article class="ex">
+          <div class="drill-head"><h3>Yawn and sigh</h3><span class="mins">1 min</span></div>
+          <p>Tension in the throat is the biggest enemy of a strong voice. A yawn opens everything up.</p>
+          <ol><li>Take a big, slow yawn, letting your throat open wide.</li><li>Halfway through, sigh it out on a gentle "haaah" from high to low.</li><li>Repeat three to five times.</li></ol>
+        </article>
+        <article class="ex">
+          <div class="drill-head"><h3>Jaw and tongue release</h3><span class="mins">1 min</span></div>
+          <p>A tight jaw muffles your voice and makes you mumble.</p>
+          <ol><li>Massage the hinge of your jaw, just in front of your ears, in small circles.</li><li>Let your jaw hang loose and gently shake your head side to side.</li><li>Stick your tongue out and down toward your chin for five seconds, then relax.</li><li>Roll your shoulders back three times.</li></ol>
+        </article>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Look after your voice</h2>
+      <ul class="tips">
+        <li><b>Drink water through the day.</b><span>Your vocal cords need to be well hydrated. Sipping all day beats gulping before you speak.</span></li>
+        <li><b>Swallow instead of clearing your throat.</b><span>Throat clearing slams your vocal cords together. A sip of water or a swallow works better.</span></li>
+        <li><b>Don't whisper to rest your voice.</b><span>Whispering strains your voice more than soft speaking. Real rest means silence.</span></li>
+        <li><b>Warm up before long talks.</b><span>Two minutes of lip trills and humming protects your voice like stretching before a run.</span></li>
+        <li><b>Avoid shouting over noise.</b><span>Move closer, use a mic, or wait for the room to settle.</span></li>
+        <li><b>Sleep and steam.</b><span>A tired body makes a tired voice. Breathing in steam from a hot shower soothes a dry throat.</span></li>
+      </ul>
+    </div>
+  </section>
+
   <!-- HISTORY -->
   <section class="card">
     <div class="hist-head">
@@ -539,7 +698,7 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
   // ---------- tabs ----------
-  const tabs = [["tab-live", "panel-live"], ["tab-file", "panel-file"], ["tab-drills", "panel-drills"], ["tab-tips", "panel-tips"]];
+  const tabs = [["tab-live", "panel-live"], ["tab-file", "panel-file"], ["tab-drills", "panel-drills"], ["tab-tips", "panel-tips"], ["tab-voice", "panel-voice"]];
   function showTab(id) {
     tabs.forEach(([t, p]) => { const on = t === id; $(t).setAttribute("aria-selected", on); $(p).hidden = !on; });
     charts.forEach(([r, cv]) => drawChart(r, cv));
@@ -1296,6 +1455,38 @@ select { font: 15px var(--body); color: var(--ink); background: var(--bg); borde
   $("tallyBtn").onclick = () => { tally++; $("tallyNum").textContent = tally; };
 
   showTwister(); paceRender(); showBest(); renderRoutine();
+
+  // ---------- voice exercises: countdown timers and breath-test stopwatches ----------
+  document.querySelectorAll(".timer-btn").forEach((b) => {
+    const label = b.textContent; let t = null;
+    b.addEventListener("click", () => {
+      if (t) { clearInterval(t); t = null; b.classList.remove("running"); b.textContent = label; return; }
+      let left = Number(b.dataset.secs);
+      b.classList.add("running"); b.textContent = fmtTime(left) + " · Stop";
+      t = setInterval(() => {
+        left--;
+        if (left <= 0) { clearInterval(t); t = null; b.classList.remove("running"); b.textContent = "Done ✓"; setTimeout(() => { if (!t) b.textContent = label; }, 3000); return; }
+        b.textContent = fmtTime(left) + " · Stop";
+      }, 1000);
+    });
+  });
+  document.querySelectorAll(".stopwatch").forEach((sw) => {
+    const key = "speaking-coach.best." + sw.dataset.key, timeEl = sw.querySelector(".sw-time"), btn = sw.querySelector(".sw-btn"), bestEl = sw.querySelector(".sw-best");
+    const goal = bestEl.textContent;
+    let start = 0, raf = null;
+    const getBest = () => { try { const v = localStorage.getItem(key); return v == null ? null : Number(v); } catch (e) { return null; } };
+    const showBest = (extra) => { const b = getBest(); bestEl.textContent = (extra ? extra + " " : "") + (b != null ? `Your best: ${b.toFixed(1)} s. ` : "") + goal; };
+    const frame = () => { timeEl.textContent = ((performance.now() - start) / 1000).toFixed(1) + " s"; raf = requestAnimationFrame(frame); };
+    btn.addEventListener("click", () => {
+      if (!raf) { start = performance.now(); sw.classList.add("running"); btn.textContent = "Stop"; frame(); return; }
+      cancelAnimationFrame(raf); raf = null; sw.classList.remove("running"); btn.textContent = "Try again";
+      const secs = (performance.now() - start) / 1000, best = getBest();
+      timeEl.textContent = secs.toFixed(1) + " s";
+      if (secs >= 2 && (best == null || secs > best)) { try { localStorage.setItem(key, secs.toFixed(1)); } catch (e) {} showBest(best == null ? "First score saved." : "New best!"); }
+      else showBest();
+    });
+    showBest();
+  });
 
   // ---------- initial example state ----------
   const EXAMPLE = "So I work on the marketing team, and basically my job is to help loan officers, um, find new clients. We write emails and social posts that they can share with their network. It matters because, you know, most people only talk to one lender before they buy a home, and they actually end up paying more than they need to. So if we can, like, put better information in front of them earlier, they make a better decision. And for the loan officer it means they get more referrals without having to cold call. I think the part I enjoy most is seeing which emails actually work, and then doing more of that.";
